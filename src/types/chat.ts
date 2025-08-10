@@ -36,6 +36,8 @@ export type ModelType =
   | "x-ai/grok-3"
   | "x-ai/grok-4"
   | "x-ai/grok-vision-beta"
+  | "z-ai/glm-4.5"
+  | "z-ai/glm-4.5-air:free"
   | "google/gemini-2.5-flash-lite"
   | "google/gemini-2.5-flash"
   | "google/gemini-2.5-pro"
