@@ -181,14 +181,16 @@ const ChatInput = ({
     }
   };
 
-  // Function to handle image generation
+  // Function to handle image generation via Getimg FLUX.1 [schnell]
   const generateImage = async (prompt: string) => {
     try {
-      // Get the API key from localStorage
-      const apiKey = localStorage.getItem('apiKey');
-      
-      if (!apiKey) {
-        throw new Error("API key is missing. Please set your xAI API key in the settings.");
+      const openRouterApiKey = localStorage.getItem('apiKey');
+      const getimgApiKey = localStorage.getItem('getimgApiKey');
+      if (!openRouterApiKey) {
+        throw new Error("API key is missing. Please set your OpenRouter API key in the settings.");
+      }
+      if (!getimgApiKey) {
+        throw new Error("Getimg API key is missing. Please set it in Settings under Getimg API Key.");
       }
       
       // First, add the user's message to the chat
@@ -197,39 +199,80 @@ const ChatInput = ({
       // Create a message with placeholder immediately
       const messageId = generateId('assistant-');
       
-      // Create and send placeholder message with minimal text content
-      onSendMessage("Generating image...", [], [], false, false, messageId, true, prompt);
+      // Create and send placeholder message with minimal text content (assistant)
+      onSendMessage("Generating image...", [], [], true, false, messageId, true, prompt);
       
-      // Enhance the prompt using AI
+      // Enhance the prompt using AI (OpenRouter text model)
       const enhancedPrompt = await enhancePromptWithAI(prompt);
-      
-      // Make API request to image generation endpoint (OpenRouter DALL-E compatible if available)
-      const response = await fetch('https://openrouter.ai/api/v1/images', {
+
+      // Call Getimg with minimal body per docs: expect top-level { url }
+      const response = await fetch('https://api.getimg.ai/v1/flux-schnell/text-to-image', {
         method: 'POST',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': window?.location?.origin || '',
-          'X-Title': 'GrokTalk'
+          'Authorization': `Bearer ${getimgApiKey}`,
         },
         body: JSON.stringify({
-          // Note: update to a supported image model on OpenRouter if needed
-          model: "openai/dall-e-3",
-          prompt: enhancedPrompt,
-          n: 1,
-          response_format: "url"
+          prompt: enhancedPrompt
         })
       });
-      
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`API error: ${response.status} - ${errorData.error || 'Unknown error'}`);
+        let errMsg = `API error: ${response.status}`;
+        try {
+          const errBody = await response.json();
+          const message = typeof errBody?.error === 'string' ? errBody.error : JSON.stringify(errBody?.error || errBody);
+          errMsg += ` - ${message}`;
+        } catch {
+          try {
+            const text = await response.text();
+            errMsg += ` - ${text}`;
+          } catch {}
+        }
+        throw new Error(errMsg);
       }
-      
+
       const data = await response.json();
-      
-      if (data.data && data.data.length > 0) {
-        const imageUrl = data.data[0].url;
+      // Accept multiple response shapes from Getimg
+      let imageUrl: string | null = null;
+      try {
+        if (typeof data?.url === 'string' && data.url) {
+          imageUrl = data.url;
+        } else if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
+          const first = data.data[0];
+          if (first.url) {
+            imageUrl = String(first.url);
+          } else if (first.b64_json) {
+            imageUrl = `data:image/png;base64,${first.b64_json}`;
+          } else if (first.base64 || first.base64Image || first.image) {
+            const b64 = first.base64 || first.base64Image || first.image;
+            imageUrl = `data:image/png;base64,${b64}`;
+          }
+        } else if (Array.isArray(data?.output) && data.output.length > 0) {
+          // Some endpoints return output: [url | base64]
+          const first = data.output[0];
+          if (typeof first === 'string' && first.startsWith('http')) {
+            imageUrl = first;
+          } else if (typeof first === 'string') {
+            imageUrl = first.startsWith('data:') ? first : `data:image/png;base64,${first}`;
+          }
+        } else if (Array.isArray(data?.images) && data.images.length > 0) {
+          const first = data.images[0];
+          if (typeof first === 'string' && first.startsWith('http')) {
+            imageUrl = first;
+          } else if (typeof first === 'string') {
+            imageUrl = first.startsWith('data:') ? first : `data:image/png;base64,${first}`;
+          }
+        } else if (typeof data?.image === 'string') {
+          const v = data.image;
+          imageUrl = v.startsWith('data:') ? v : `data:image/png;base64,${v}`;
+        }
+      } catch (parseErr) {
+        console.warn('Unexpected Getimg response format', parseErr, data);
+      }
+
+      if (imageUrl) {
         
         // Update the existing message with the generated image
         if (onUpdateMessageWithImage) {
@@ -239,7 +282,8 @@ const ChatInput = ({
           console.error("Update message function not available");
         }
       } else {
-        throw new Error('No image data returned');
+        console.error('Getimg response body (unparsed):', data);
+        throw new Error('No image data returned from Getimg');
       }
     } catch (error) {
       console.error('Image generation failed:', error);

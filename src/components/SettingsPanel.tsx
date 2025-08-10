@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { ChevronsUpDown, Eye, EyeOff } from "lucide-react";
+import { useSettings } from "@/contexts/SettingsContext";
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -27,22 +28,34 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 }) => {
   const [inputApiKey, setInputApiKey] = useState(apiKey);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [inputGetimgKey, setInputGetimgKey] = useState("");
+  const [showGetimgKey, setShowGetimgKey] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [temperatureValue, setTemperatureValue] = useState(temperature);
   const [maxTokensValue, setMaxTokensValue] = useState(maxTokens);
   const [isTestingKey, setIsTestingKey] = useState(false);
+  const [isTestingGetimgKey, setIsTestingGetimgKey] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const { toast } = useToast();
+  const { getimgApiKey, setGetimgApiKey } = useSettings();
 
   useEffect(() => {
     setInputApiKey(apiKey);
     setTemperatureValue(temperature);
     setMaxTokensValue(maxTokens);
+    setInputGetimgKey(getimgApiKey || localStorage.getItem('getimgApiKey') || "");
   }, [apiKey, temperature, maxTokens]);
 
   const handleSave = () => {
     try {
       onSave(inputApiKey, temperatureValue, maxTokensValue);
+      // Save Getimg key via context + localStorage
+      setGetimgApiKey(inputGetimgKey || "");
+      if (inputGetimgKey) {
+        localStorage.setItem('getimgApiKey', inputGetimgKey);
+      } else {
+        localStorage.removeItem('getimgApiKey');
+      }
       setSaveStatus("success");
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (error) {
@@ -186,6 +199,85 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
                 >
                   openrouter.ai
+                </a>.
+              </p>
+            </div>
+
+            {/* Getimg API Key Section */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                 Getimg API Key
+              </label>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                Used for image generation via FLUX.1 [schnell]. Only required for images.
+              </p>
+              <div className="flex relative">
+                <Input
+                  type={showGetimgKey ? "text" : "password"}
+                  value={inputGetimgKey}
+                  onChange={(e) => setInputGetimgKey(e.target.value)}
+                  className="pr-10"
+                  placeholder="Enter your Getimg API key..."
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowGetimgKey(!showGetimgKey)}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500"
+                >
+                  {showGetimgKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  Stored locally. Not sent anywhere except to Getimg when generating images.
+                </div>
+                
+                <button
+                  onClick={async () => {
+                    if (!inputGetimgKey.trim()) {
+                      toast({ title: "API Key Required", description: "Enter your Getimg API key to test.", variant: "destructive" });
+                      return;
+                    }
+                    setIsTestingGetimgKey(true);
+                    try {
+                      const resp = await fetch('https://api.getimg.ai/v1/account/balance', {
+                        method: 'GET',
+                        headers: {
+                          'Authorization': `Bearer ${inputGetimgKey}`,
+                        },
+                      });
+                      if (resp.ok) {
+                        toast({ title: "Getimg Key Valid", description: "Balance retrieved successfully." });
+                      } else {
+                        const err = await resp.text();
+                        toast({ title: "Getimg Key Invalid", description: err || 'Request failed', variant: "destructive" });
+                      }
+                    } catch (e) {
+                      toast({ title: "Connection Error", description: "Could not reach Getimg API.", variant: "destructive" });
+                    } finally {
+                      setIsTestingGetimgKey(false);
+                    }
+                  }}
+                  disabled={isTestingGetimgKey}
+                  className={cn(
+                    "text-sm px-3 py-1 rounded-md flex items-center gap-1",
+                    isTestingGetimgKey 
+                      ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed" 
+                      : "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50"
+                  )}
+                >
+                  <Zap size={14} />
+                  {isTestingGetimgKey ? "Testing..." : "Test Getimg Key"}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                See the API docs for FLUX.1 [schnell] at <a
+                  href="https://docs.getimg.ai/reference/postfluxschnelltexttoimage"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  docs.getimg.ai
                 </a>.
               </p>
             </div>

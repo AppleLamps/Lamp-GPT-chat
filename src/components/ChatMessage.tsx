@@ -416,14 +416,19 @@ const ChatMessage = ({ message, onRegenerate }: ChatMessageProps) => {
         {/* Display image generation placeholder */}
         {message.isGeneratingImage && (
           <div className="mt-3">
-            <div className="relative w-full h-0 pb-[56.25%] bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden">
+            <div className="relative w-full h-0 pb-[56.25%] rounded-md overflow-hidden glass-gold gold-gradient">
+              {/* animated shimmer sweep */}
+              <div className="gold-shimmer" />
+
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="animate-pulse flex flex-col items-center">
-                  <Image size={48} className="text-gray-400 dark:text-gray-600 mb-3" />
-                  <div className="h-4 w-28 bg-gray-300 dark:bg-gray-700 rounded-md mb-2"></div>
-                  <div className="h-3 w-48 bg-gray-200 dark:bg-gray-800 rounded-md"></div>
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center justify-center h-14 w-14 rounded-full bg-gold-soft/40 border border-yellow-400/30 shadow-lg shadow-yellow-500/10">
+                    <Image size={28} className="text-yellow-500" />
+                  </div>
+                  <div className="mt-3 h-3 w-32 rounded-full bg-gold-soft animate-pulse"></div>
+                  <div className="mt-2 h-2 w-56 rounded-full bg-gold-soft/70 animate-pulse"></div>
                 </div>
-                <div className="absolute bottom-4 left-0 right-0 text-center text-sm text-gray-500 dark:text-gray-400">
+                <div className="absolute bottom-4 left-0 right-0 text-center text-sm text-gold">
                   Generating image of {message.imagePrompt ? <strong>{message.imagePrompt}</strong> : ''}...
                 </div>
               </div>

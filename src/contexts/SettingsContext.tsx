@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 // Context default values
 interface SettingsContextType {
   apiKey: string;
+  getimgApiKey: string;
   modelTemperature: number;
   maxTokens: number;
   currentModel: string;
@@ -12,6 +13,7 @@ interface SettingsContextType {
   
   // Setters
   setApiKey: React.Dispatch<React.SetStateAction<string>>;
+  setGetimgApiKey: React.Dispatch<React.SetStateAction<string>>;
   setModelTemperature: React.Dispatch<React.SetStateAction<number>>;
   setMaxTokens: React.Dispatch<React.SetStateAction<number>>;
   setCurrentModel: React.Dispatch<React.SetStateAction<string>>;
@@ -27,6 +29,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // State for settings
   const [apiKey, setApiKey] = useState("");
+  const [getimgApiKey, setGetimgApiKey] = useState("");
   const [modelTemperature, setModelTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(4000);
   const [currentModel, setCurrentModel] = useState<string>('x-ai/grok-4');
@@ -37,6 +40,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   useEffect(() => {
     // Load settings from localStorage
     const storedApiKey = localStorage.getItem('apiKey');
+    const storedGetimgApiKey = localStorage.getItem('getimgApiKey');
     const storedTemperature = localStorage.getItem('modelTemperature');
     const storedMaxTokens = localStorage.getItem('maxTokens');
     const storedModel = localStorage.getItem('currentModel');
@@ -46,6 +50,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     } else {
       // Automatically open settings panel if no API key is stored
       setSettingsOpen(true);
+    }
+
+    if (storedGetimgApiKey) {
+      setGetimgApiKey(storedGetimgApiKey);
     }
     
     if (storedTemperature) {
@@ -91,6 +99,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   const value = {
     apiKey,
+    getimgApiKey,
     modelTemperature,
     maxTokens,
     currentModel,
@@ -98,6 +107,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     setSettingsOpen,
     
     setApiKey,
+    setGetimgApiKey,
     setModelTemperature,
     setMaxTokens,
     setCurrentModel,

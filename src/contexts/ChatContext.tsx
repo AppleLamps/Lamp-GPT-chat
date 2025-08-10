@@ -780,10 +780,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     // If this is a bot-generated image, create an assistant message directly
     if (isBotGenerated) {
       const botMessage: Message = {
-        id: generateId('assistant-'),
+        id: customMessageId || generateId('assistant-'),
         role: "assistant",
         content: messageContent,
         timestamp: new Date(),
+        isGeneratingImage: Boolean(isGeneratingImage),
+        imagePrompt: imagePrompt,
       };
 
       // Add directly to messages
@@ -1131,39 +1133,44 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
   // Function to update a message with a generated image
   const updateMessageWithImage = (messageId: string, text: string, imageUrl: string) => {
-    setMessages(prev =>
-      prev.map(msg =>
+    setMessages(prev => {
+      const updated = prev.map(msg =>
         msg.id === messageId
           ? {
-            ...msg,
-            content: [
-              { type: "text", text: text },
-              {
-                type: "image_url",
-                image_url: {
-                  url: imageUrl,
-                  detail: "high"
-                }
-              }
-            ],
-            isGeneratingImage: false
-          }
+              ...msg,
+              content: [
+                { type: "text", text },
+                { type: "image_url", image_url: { url: imageUrl, detail: "high" } }
+              ],
+              isGeneratingImage: false
+            }
           : msg
-      )
-    );
-    // Save updated messages
-    setTimeout(() => {
-      try {
-        storeInLocalStorage(STORAGE_KEYS.MESSAGES, messages);
+      );
 
-        // Update saved chats
-        if (currentChatId) {
-          saveCurrentChat();
-        }
+      // Persist immediately with the updated array to avoid stale overwrites
+      try {
+        storeInLocalStorage(STORAGE_KEYS.MESSAGES, updated);
       } catch (err) {
-        console.error("Error in updateMessageWithImage timeout handler:", err);
+        console.error("Failed to persist updated messages:", err);
       }
-    }, 100);
+
+      // Also update saved chat snapshot if there is a current chat
+      if (currentChatId) {
+        setSavedChats(prevChats => {
+          const idx = prevChats.findIndex(c => c.id === currentChatId);
+          if (idx === -1) return prevChats;
+          const updatedChats = [...prevChats];
+          updatedChats[idx] = {
+            ...updatedChats[idx],
+            messages: updated,
+            lastUpdated: new Date(),
+          };
+          return updatedChats;
+        });
+      }
+
+      return updated;
+    });
   };
 
   // Context value
