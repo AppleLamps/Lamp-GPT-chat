@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronDown, ChevronUp, Brain } from 'lucide-react';
 import ChatMessage from './ChatMessage';
 import { useChatContext } from '@/contexts/ChatContext';
 
@@ -26,6 +27,7 @@ const ChatMessages = () => {
       className="flex-1 overflow-y-auto bg-white dark:bg-gray-800"
     >
       <div className="pb-32">
+        {/* Global reasoning removed; per-message rendering handled in ChatMessage */}
         {displayMessages.map((message) => (
           <ChatMessage 
             key={message.id} 

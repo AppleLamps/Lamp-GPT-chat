@@ -61,6 +61,7 @@ export interface ChatCompletionStreamResponse {
 
 export interface StreamCallbacks {
   onChunk: (chunk: string) => void;
+  onReasoningChunk?: (chunk: string) => void;
   onComplete: () => void;
   onError: (error: Error) => void;
 }

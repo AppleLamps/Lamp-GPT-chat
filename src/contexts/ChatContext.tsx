@@ -28,6 +28,8 @@ export interface Message {
   citations?: string[];
   isGeneratingImage?: boolean;
   imagePrompt?: string;
+  reasoning?: string;
+  reasoningVisible?: boolean;
 }
 
 export interface SavedChat {
@@ -68,6 +70,7 @@ interface ChatContextType {
   messagesEndRef: React.RefObject<HTMLDivElement>;
   messagesContainerRef: React.RefObject<HTMLDivElement>;
   regenerateMessage: (messageId: string) => void;
+  setMessageReasoningVisible: (messageId: string, visible: boolean) => void;
 }
 
 // Create context
@@ -137,6 +140,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
   // Refs
   const streamingContentRef = useRef<string>("");
+  const reasoningContentRef = useRef<string>("");
   const streamCompletedRef = useRef<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -252,6 +256,20 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   }, []);
 
   // Save messages to localStorage
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { messageId: string; visible: boolean };
+      if (!detail) return;
+      const { messageId, visible } = detail;
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reasoningVisible: visible } : m));
+      setStreamingMessage(prev => prev && prev.id === messageId ? { ...prev, reasoningVisible: visible } : prev);
+    };
+    window.addEventListener('toggleMessageReasoning', handler as EventListener);
+    return () => {
+      window.removeEventListener('toggleMessageReasoning', handler as EventListener);
+    };
+  }, []);
+
   useEffect(() => {
     if (messages.length > 0) {
       storeInLocalStorage(STORAGE_KEYS.MESSAGES, messages);
@@ -776,11 +794,14 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         role: "assistant",
         content: "",
         timestamp: new Date(),
+        reasoning: "",
+        reasoningVisible: false,
       };
 
       setStreamingMessage(initialStreamingMessage);
       streamingContentRef.current = "";
       streamCompletedRef.current = false;
+      reasoningContentRef.current = "";
 
       // Standard model flow (no Sonar)
       try {
@@ -806,6 +827,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           {
             onChunk: (chunk) => {
               if (streamCompletedRef.current) return;
+              // When main answer starts streaming, auto-minimize reasoning on the streaming message
+              setStreamingMessage((prev) => prev ? { ...prev, reasoningVisible: false } : prev);
               // Update content ref
               if (typeof streamingContentRef.current === 'string') {
                 streamingContentRef.current += chunk;
@@ -832,6 +855,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
                 }
               });
             },
+            onReasoningChunk: (chunk) => {
+              if (streamCompletedRef.current) return;
+              reasoningContentRef.current += String(chunk);
+              setStreamingMessage((prev) => prev ? { ...prev, reasoning: reasoningContentRef.current, reasoningVisible: true } : prev);
+            },
             onComplete: () => {
               if (streamCompletedRef.current) return;
               streamCompletedRef.current = true;
@@ -842,12 +870,15 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
               setStreamingMessage(null);
               setIsProcessing(false);
               streamingContentRef.current = "";
+              // No global reasoning state
 
               // Create final message
               const finalMessage: Message = {
                 id: generateId('assistant-'),
                 role: "assistant",
                 content: finalContent,
+                reasoning: reasoningContentRef.current || undefined,
+                reasoningVisible: false,
                 timestamp: new Date()
               };
 
@@ -974,6 +1005,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         role: "assistant",
         content: "",
         timestamp: new Date(),
+        reasoning: "",
+        reasoningVisible: false,
       };
 
       setStreamingMessage(initialStreamingMessage);
@@ -1003,6 +1036,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
               };
             });
           },
+          onReasoningChunk: (chunk) => {
+            if (streamCompletedRef.current) return;
+            reasoningContentRef.current += String(chunk);
+            setStreamingMessage((prev) => prev ? { ...prev, reasoning: reasoningContentRef.current, reasoningVisible: true } : prev);
+          },
           onComplete: () => {
             if (streamCompletedRef.current) return;
             streamCompletedRef.current = true;
@@ -1019,6 +1057,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
               id: generateId('assistant-'),
               role: "assistant",
               content: finalContent,
+              reasoning: reasoningContentRef.current || undefined,
+              reasoningVisible: false,
               timestamp: new Date()
             };
 
@@ -1115,6 +1155,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     messagesEndRef,
     messagesContainerRef,
     regenerateMessage,
+    setMessageReasoningVisible: (messageId: string, visible: boolean) => {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reasoningVisible: visible } : m));
+      setStreamingMessage(prev => prev && prev.id === messageId ? { ...prev, reasoningVisible: visible } as Message : prev);
+    }
   };
 
   return (

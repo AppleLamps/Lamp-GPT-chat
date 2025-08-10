@@ -130,6 +130,9 @@ export const openRouterProvider: AIServiceProvider = {
               try {
                 const parsed: ChatCompletionStreamResponse = JSON.parse(data);
                 const chunk = parsed.choices?.[0]?.delta?.content;
+                // Some reasoning models return 'reasoning' field in delta
+                const reasoningChunk = (parsed as any)?.choices?.[0]?.delta?.reasoning;
+                if (reasoningChunk && callbacks.onReasoningChunk) callbacks.onReasoningChunk(reasoningChunk as unknown as string);
                 if (chunk) onChunk(chunk);
               } catch {}
             }

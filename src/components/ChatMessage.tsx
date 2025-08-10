@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Bot, User, Copy, ThumbsUp, ThumbsDown, Check, Play, RefreshCw, XCircle, Clock, RotateCw, Image } from "lucide-react";
+import { Bot, User, Copy, ThumbsUp, ThumbsDown, Check, Play, RefreshCw, XCircle, Clock, RotateCw, Image, Brain, ChevronDown, ChevronUp } from "lucide-react";
+import { useChatContext } from '@/contexts/ChatContext';
 import { cn } from "@/lib/utils";
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -54,6 +55,8 @@ interface ChatMessageProps {
     fileNames?: string[]; // File names for file-based messages
     isGeneratingImage?: boolean; // Flag for generating image state
     imagePrompt?: string; // The original image prompt
+    reasoning?: string;
+    reasoningVisible?: boolean;
   };
   onRegenerate?: () => void;
 }
@@ -266,7 +269,6 @@ const CodeBlock = ({ language, value }: { language: string, value: string }) => 
           <div 
             ref={outputRef}
             className="bg-black text-white p-3 font-mono text-sm overflow-auto max-h-[300px]"
-            style={{ maxHeight: '300px' }}
           >
             {isRunning ? (
               <div className="text-gray-400">Running code...</div>
@@ -292,6 +294,7 @@ const ChatMessage = ({ message, onRegenerate }: ChatMessageProps) => {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
   const customBotName = useCustomBotName();
+  const { setMessageReasoningVisible } = useChatContext();
   
   // Format timestamp for display
   const formatTimestamp = (timestamp: Date) => {
@@ -502,6 +505,34 @@ const ChatMessage = ({ message, onRegenerate }: ChatMessageProps) => {
             </div>
           )}
           
+          {/* Per-message reasoning panel for assistant messages */}
+          {!isUser && message.reasoning && (
+            <div className="mb-2 rounded-md border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
+              <div className="flex items-center justify-between px-2 py-1 text-[11px] text-yellow-800 dark:text-yellow-200">
+                <div className="flex items-center gap-1">
+                  <Brain size={12} />
+                  <span>Thinking</span>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const isVisible = Boolean(message.reasoningVisible);
+                    setMessageReasoningVisible(message.id, !isVisible);
+                  }}
+                  className="p-1 rounded hover:bg-yellow-100/60 dark:hover:bg-yellow-800/40"
+                  aria-label={message.reasoningVisible ? 'Hide thinking' : 'Show thinking'}
+                >
+                  {message.reasoningVisible ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </button>
+              </div>
+              {message.reasoningVisible && (
+                <div className="px-2 pb-2 text-xs whitespace-pre-wrap text-yellow-900 dark:text-yellow-100">
+                  {message.reasoning}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Render message content */}
           {renderContent()}
           

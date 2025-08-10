@@ -272,6 +272,7 @@ export const xaiService = {
     apiKey: string,
     callbacks: {
       onChunk: (chunk: string) => void,
+      onReasoningChunk?: (chunk: string) => void,
       onComplete: () => void,
       onError: (error: Error) => void
     },
@@ -312,7 +313,7 @@ export const xaiService = {
         await openRouterProvider.streamResponse(
           formattedMessages,
           cleanApiKey,
-          { onChunk, onComplete, onError },
+          { onChunk, onComplete, onError, onReasoningChunk: callbacks.onReasoningChunk },
           options
         );
 
