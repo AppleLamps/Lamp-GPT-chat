@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Bot, User, Copy, ThumbsUp, ThumbsDown, Check, Play, RefreshCw, XCircle, Clock, RotateCw, Image, Brain, ChevronDown, ChevronUp } from "lucide-react";
+import { Bot, User, Copy, ThumbsUp, ThumbsDown, Check, Play, RefreshCw, XCircle, Clock, RotateCw, Image, Brain, ChevronDown, ChevronUp, Download } from "lucide-react";
 import { useChatContext } from '@/contexts/ChatContext';
 import { cn } from "@/lib/utils";
 import ReactMarkdown from 'react-markdown';
@@ -330,11 +330,38 @@ const ChatMessage = ({ message, onRegenerate }: ChatMessageProps) => {
     setTimeout(() => setCopied(false), 2000);
   };
   
+  // Extract any image URLs from message content for convenience
+  const imageUrls = React.useMemo(() => {
+    if (Array.isArray(message.content)) {
+      return message.content
+        .filter((item): item is { type: "image_url"; image_url: { url: string; detail: "high" | "low" | "auto" } } =>
+          item.type === 'image_url' && !!item.image_url && typeof item.image_url.url === 'string'
+        )
+        .map(item => item.image_url.url);
+    }
+    return [] as string[];
+  }, [message]);
+
+  const downloadFirstImage = () => {
+    if (imageUrls.length === 0) return;
+    const url = imageUrls[0];
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      const base = (message.imagePrompt || 'generated-image').toString().slice(0, 40).replace(/[^a-z0-9-_ ]/gi, '').trim() || 'generated-image';
+      a.download = `${base}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error('Failed to trigger image download', e);
+    }
+  };
+  
   // Render message content
   const renderContent = () => {
     // Extract content based on type
     let contentToRender = "";
-    let imageUrls: string[] = [];
     
     // Handle complex content structure that might include images
     if (typeof message.content === 'string') {
@@ -344,8 +371,6 @@ const ChatMessage = ({ message, onRegenerate }: ChatMessageProps) => {
       message.content.forEach(item => {
         if (item.type === 'text' && item.text) {
           contentToRender += item.text;
-        } else if (item.type === 'image_url' && item.image_url) {
-          imageUrls.push(item.image_url.url);
         }
       });
     }
@@ -551,6 +576,17 @@ const ChatMessage = ({ message, onRegenerate }: ChatMessageProps) => {
               <Copy size={16} />
               {copied && <span className="ml-1 text-xs">Copied!</span>}
             </button>
+            {/* Download image (assistant messages with images only) */}
+            {!isUser && imageUrls.length > 0 && (
+              <button
+                onClick={downloadFirstImage}
+                className="p-1 hover:text-gray-700 dark:hover:text-gray-200 rounded"
+                aria-label="Download image"
+                title="Download image"
+              >
+                <Download size={16} />
+              </button>
+            )}
             
             {/* Regenerate button - only for assistant messages */}
             {!isUser && onRegenerate && (
