@@ -30,18 +30,10 @@ const addMarkdownFormattingInstructions = (messages: Message[]): Message[] => {
   const formattingText = "Format your responses using Markdown for better readability when appropriate: use *italics* for emphasis, bullet points and numbered lists where appropriate, and code blocks with syntax highlighting (```language) for code snippets.";
 
   // Create a copy of the messages to avoid mutating the original
-  const updatedMessages = [...messages];
-
-  // Ensure all message contents are strings (X.AI API requirement)
-  for (let i = 0; i < updatedMessages.length; i++) {
-    if (typeof updatedMessages[i].content !== 'string') {
-      console.warn("Converting non-string message content to string", updatedMessages[i]);
-      updatedMessages[i] = {
-        ...updatedMessages[i],
-        content: JSON.stringify(updatedMessages[i].content)
-      };
-    }
-  }
+  // IMPORTANT: Do NOT coerce non-string content to string.
+  // OpenRouter multimodal requires content to support arrays like
+  // [{ type: "text", text: "..." }, { type: "image_url", image_url: { url, detail } }].
+  const updatedMessages = messages.map(m => ({ ...m }));
 
   // Check if a system message exists
   const systemMessageIndex = updatedMessages.findIndex(msg => msg.role === "system");

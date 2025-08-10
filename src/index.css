@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide horizontal scrollbar for template scroller while keeping scrolling functional */
+.templates-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+.templates-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(107, 114, 128, 0.4);
+  border-radius: 9999px;
+}
+@supports not selector(::-webkit-scrollbar) {
+  .templates-scroll {
+    scrollbar-width: thin;
+  }
+}
+
 @layer base {
   :root {
     --background: 210 20% 98%;

@@ -286,11 +286,11 @@ const ChatInput = ({
     }
     
     const validFiles = files.filter(file => {
-      const isValidType = ['image/jpeg', 'image/jpg', 'image/png'].includes(file.type);
+      const isValidType = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'].includes(file.type);
       const isValidSize = file.size <= 10 * 1024 * 1024; // 10MiB
       
       if (!isValidType) {
-        alert(`File "${file.name}" has an invalid format. Only JPG/JPEG and PNG are supported.`);
+        alert(`File "${file.name}" has an invalid format. Supported: JPG/JPEG, PNG, WEBP, GIF.`);
       }
       if (!isValidSize) {
         alert(`File "${file.name}" exceeds the maximum size of 10MiB.`);
@@ -451,7 +451,7 @@ const ChatInput = ({
                 ref={fileInputRef}
                 onChange={handleImageUpload}
                 multiple
-                accept="image/jpeg,image/jpg,image/png"
+                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
                 className="hidden"
                 aria-label="Upload images"
                 title="Upload images"
@@ -539,6 +539,8 @@ const ChatInput = ({
                       <SelectItem value="google/gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
                       <SelectItem value="google/gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
                       <SelectItem value="cognitivecomputations/dolphin-mistral-24b-venice-edition:free">Venice Uncensored</SelectItem>
+                       <SelectItem value="openai/gpt-4o-2024-11-20">GPT‑4o (2024‑11‑20)</SelectItem>
+                       <SelectItem value="openai/gpt-4.1">GPT‑4.1</SelectItem>
                       <SelectItem value="openai/gpt-5">GPT‑5 (thinking)</SelectItem>
                       <SelectItem value="openai/gpt-5-chat">GPT‑5</SelectItem>
                       <SelectItem value="openai/gpt-5-mini">GPT‑5 Mini</SelectItem>

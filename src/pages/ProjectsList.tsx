@@ -144,7 +144,6 @@ const ProjectsList: React.FC = () => {
                 onClick={() => setViewMode('grid')}
                 className={`p-2 rounded ${viewMode === 'grid' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'} transition-colors`}
                 aria-label="Grid view"
-                aria-pressed={viewMode === 'grid'}
               >
                 <LayoutGrid size={18} />
               </button>
@@ -152,7 +151,6 @@ const ProjectsList: React.FC = () => {
                 onClick={() => setViewMode('list')}
                 className={`p-2 rounded ${viewMode === 'list' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'} transition-colors`}
                 aria-label="List view"
-                aria-pressed={viewMode === 'list'}
               >
                 <List size={18} />
               </button>

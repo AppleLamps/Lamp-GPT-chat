@@ -1,19 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { FolderKanban, MoreVertical, Edit, Trash2, MessageSquare, Calendar } from 'lucide-react';
 import { Project } from '@/contexts/ProjectsContext';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
+import { useNavigate } from 'react-router-dom';
 
 interface ProjectCardProps {
   project: Project;
-  onEdit: (project: Project) => void;
-  onDelete: (id: string) => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onEdit, onDelete }) => {
@@ -97,7 +90,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onEdit, onDelete }) 
               <div className="absolute right-0 w-56 mt-2 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-50 animate-in fade-in-50 slide-in-from-top-5 duration-200">
                 <button 
                   onClick={() => {
-                    onEdit(project);
+                    onEdit();
                     setShowMenu(false);
                   }} 
                   className="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
@@ -108,7 +101,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onEdit, onDelete }) 
                 <div className="h-px my-1 bg-gray-200 dark:bg-gray-700" />
                 <button 
                   onClick={() => {
-                    onDelete(project.id);
+                    onDelete();
                     setShowMenu(false);
                   }} 
                   className="flex w-full items-center px-4 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
@@ -123,7 +116,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onEdit, onDelete }) 
 
         <div className="my-4 border-t border-gray-100 dark:border-gray-700"></div>
 
-        <div className="text-sm text-gray-600 dark:text-gray-300 overflow-hidden mb-3" style={{ minHeight: '4.5rem', maxHeight: '4.5rem' }}>
+        <div className="text-sm text-gray-600 dark:text-gray-300 overflow-hidden mb-3 min-h-[4.5rem] max-h-[4.5rem]">
           <p className="line-clamp-3">{project.description || "No description provided"}</p>
         </div>
 

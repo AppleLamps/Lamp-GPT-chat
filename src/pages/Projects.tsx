@@ -372,20 +372,22 @@ const Projects: React.FC = () => {
       return;
     }
 
-    const projectData: Project = {
-      id: isEditMode ? id! : crypto.randomUUID(),
-      name: formData.name,
-      description: formData.description,
-      instructions: formData.instructions,
-      conversationStarters: formData.conversationStarters,
-      createdAt: isEditMode ? getProject(id!)?.createdAt || new Date().toISOString() : new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
     if (isEditMode) {
-      updateProject(id!, projectData);
+      // Update only allowed fields; timestamps handled by context
+      updateProject(id!, {
+        name: formData.name,
+        description: formData.description,
+        instructions: formData.instructions,
+        conversationStarters: formData.conversationStarters,
+      });
     } else {
-      addProject(projectData);
+      // Create a new project; ID and timestamps handled by context
+      addProject({
+        name: formData.name,
+        description: formData.description,
+        instructions: formData.instructions,
+        conversationStarters: formData.conversationStarters,
+      });
       // Clear draft after successful creation
       clearDraft();
     }
@@ -832,12 +834,13 @@ const Projects: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Start with a template (optional)
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 overflow-x-auto pb-2 flex-nowrap hide-scrollbar">
+                  {/* Horizontally scrollable single-row list */}
+                  <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory templates-scroll">
                     {projectTemplates.map(template => (
                       <div
                         key={template.id}
                         onClick={() => applyTemplate(template)}
-                        className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-pointer hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-all duration-200 min-w-[200px]"
+                        className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-pointer hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-all duration-200 min-w-[260px] snap-start"
                       >
                         <div className="flex items-center mb-2">
                           <div className={`rounded-md p-2 bg-gradient-to-br ${template.color} bg-opacity-10 mr-2`}>
@@ -850,7 +853,7 @@ const Projects: React.FC = () => {
                     ))}
                     <button
                       onClick={() => setIsTemplateModalOpen(true)}
-                      className="border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 min-h-[100px] min-w-[200px]"
+                      className="border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 min-h-[112px] min-w-[260px] snap-start"
                     >
                       <Plus size={20} className="mb-1" />
                       <span className="text-sm">View All Templates</span>
@@ -870,6 +873,7 @@ const Projects: React.FC = () => {
                     value={formData.name}
                     onChange={handleInputChange}
                     placeholder="What's your GPT called?"
+                    maxLength={60}
                     className={`w-full h-12 px-4 py-3 border ${validationErrors.name ? 'border-red-500 dark:border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-emerald-500 focus:border-emerald-500'} rounded-lg shadow-sm focus:outline-none focus:ring-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-all`}
                     aria-describedby={validationErrors.name ? "name-error" : undefined}
                     required
@@ -896,6 +900,7 @@ const Projects: React.FC = () => {
                       placeholder="What does your GPT do? (Optional)"
                       rows={3}
                       // min/max heights handled via CSS utility classes if needed
+                      maxLength={500}
                       className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-all"
                     />
                     <div className="absolute right-4 bottom-3 text-xs text-gray-400">
@@ -936,6 +941,7 @@ const Projects: React.FC = () => {
                       onChange={handleInputChange}
                       placeholder="Be a helpful assistant that..."
                       rows={8}
+                      maxLength={4000}
                       className={`w-full px-4 py-3 border ${validationErrors.instructions ? 'border-red-500 dark:border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-emerald-500 focus:border-emerald-500'} rounded-lg shadow-sm focus:outline-none focus:ring-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-all`}
                       aria-describedby={validationErrors.instructions ? "instructions-error" : undefined}
                     />

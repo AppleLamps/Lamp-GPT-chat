@@ -32,11 +32,21 @@ export interface Message {
   reasoningVisible?: boolean;
 }
 
+// Minimal bot info stored with a saved chat so we can restore project context later
+interface SavedBotInfo {
+  id?: string;
+  name: string;
+  description?: string;
+  instructions: string;
+}
+
 export interface SavedChat {
   id: string;
   title: string;
   messages: Message[];
   lastUpdated: Date;
+  // Optional associated project/bot for this chat
+  bot?: SavedBotInfo;
 }
 
 // Context type definitions
@@ -399,6 +409,25 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     const existingChatIndex = savedChats.findIndex(chat => chat.id === currentChatId);
     const chatTitle = getChatTitle(messages);
 
+    // Capture currently active custom bot (per chat) if present
+    let botInfo: SavedBotInfo | undefined;
+    try {
+      const activeBotRaw = sessionStorage.getItem('activeCustomBot');
+      if (activeBotRaw) {
+        const activeBot = JSON.parse(activeBotRaw);
+        if (activeBot && typeof activeBot === 'object') {
+          botInfo = {
+            id: activeBot.id,
+            name: activeBot.name,
+            description: activeBot.description,
+            instructions: activeBot.instructions,
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse activeCustomBot for saving with chat:', e);
+    }
+
     if (existingChatIndex >= 0) {
       // Update existing chat
       const updatedChats = [...savedChats];
@@ -406,7 +435,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         ...updatedChats[existingChatIndex],
         title: chatTitle,
         messages: [...messages],
-        lastUpdated: new Date()
+        lastUpdated: new Date(),
+        bot: botInfo ?? updatedChats[existingChatIndex].bot,
       };
       setSavedChats(updatedChats);
     } else {
@@ -417,7 +447,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           id: currentChatId,
           title: chatTitle,
           messages: [...messages],
-          lastUpdated: new Date()
+          lastUpdated: new Date(),
+          bot: botInfo,
         }
       ]);
     }
@@ -442,23 +473,25 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     setCurrentChatId(chatId);
     localStorage.setItem(STORAGE_KEYS.CURRENT_CHAT_ID, chatId);
 
-    // Check if this chat was with a custom bot (check for system message with instructions)
-    const systemMessage = chatToLoad.messages.find(msg => msg.role === 'system');
-    if (systemMessage) {
-      // System message exists, we need to preserve the bot information
-      const assistantMessage = chatToLoad.messages.find(msg => msg.role === 'assistant');
-      if (assistantMessage) {
-        // Extract bot name from first assistant message if possible
-        const botNameMatch = assistantMessage.content.toString().match(/I'm ([^.]+)/);
+    // Restore associated project/bot if it was saved with this chat
+    if (chatToLoad.bot) {
+      try {
+        sessionStorage.setItem('activeCustomBot', JSON.stringify(chatToLoad.bot));
+      } catch (e) {
+        console.warn('Failed to restore activeCustomBot from saved chat:', e);
+      }
+    } else {
+      // Backward-compat: attempt to infer minimal bot info from messages if present (legacy chats)
+      const systemMessage = chatToLoad.messages.find(msg => msg.role === 'system');
+      if (systemMessage) {
+        const assistantMessage = chatToLoad.messages.find(msg => msg.role === 'assistant');
+        const botNameMatch = assistantMessage?.content?.toString().match(/I'm ([^.]+)/);
         const botName = botNameMatch ? botNameMatch[1].trim() : 'Custom Bot';
-
-        // Store essential bot info in session storage
         const minimumBotInfo = {
           name: botName,
-          instructions: systemMessage.content
+          instructions: systemMessage.content as string
         };
-
-        sessionStorage.setItem('activeCustomBot', JSON.stringify(minimumBotInfo));
+        try { sessionStorage.setItem('activeCustomBot', JSON.stringify(minimumBotInfo)); } catch {}
       }
     }
   };

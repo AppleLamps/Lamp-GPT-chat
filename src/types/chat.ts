@@ -42,6 +42,8 @@ export type ModelType =
   | "google/gemini-2.5-flash"
   | "google/gemini-2.5-pro"
   | "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+  | "openai/gpt-4o-2024-11-20"
+  | "openai/gpt-4.1"
   | "openai/gpt-5"
   | "openai/gpt-5-chat"
   | "openai/gpt-5-mini"
