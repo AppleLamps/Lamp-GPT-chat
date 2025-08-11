@@ -21,7 +21,7 @@ export default async function handler(req, res) {
       if (!rows[0]) return json(req, res, 200, {});
       return json(req, res, 200, rows[0]);
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
         RETURNING user_id`;
       return json(req, res, 200, rows[0]);
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 

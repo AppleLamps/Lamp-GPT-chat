@@ -37,7 +37,7 @@ export default async function handler(req, res) {
         RETURNING id, user_id, provider, created_at`;
       return json(req, res, 200, rows[0]);
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
@@ -52,7 +52,7 @@ export default async function handler(req, res) {
       const secret = decrypt(rows[0].secret_encrypted);
       return json(req, res, 200, { userId, provider, secret });
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 

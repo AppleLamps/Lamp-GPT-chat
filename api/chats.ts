@@ -22,7 +22,7 @@ export default async function handler(req, res) {
       const rows = await sql`INSERT INTO chats (user_id, title) VALUES (${userId}, ${title || null}) RETURNING id, user_id, title, created_at, updated_at`;
       return json(req, res, 201, rows[0]);
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
       const rows = await sql`SELECT id, user_id, title, created_at, updated_at FROM chats WHERE user_id = ${userId} ORDER BY updated_at DESC`;
       return json(req, res, 200, rows);
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 

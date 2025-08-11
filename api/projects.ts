@@ -20,7 +20,7 @@ export default async function handler(req, res) {
       const rows = await sql`SELECT id, title as name, description, (data->>'instructions') as instructions, coalesce((data->'conversationStarters')::jsonb, '[]'::jsonb) as conversationStarters, created_at as "createdAt", updated_at as "updatedAt" FROM projects WHERE user_id = ${userId} ORDER BY updated_at DESC`;
       return json(req, res, 200, rows);
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
       const rows = await sql`INSERT INTO projects (user_id, title, description, data) VALUES (${userId}, ${name}, ${description || ''}, ${JSON.stringify({ instructions: instructions || '', conversationStarters: conversationStarters || [] })}::jsonb) RETURNING id, title as name, description, created_at as "createdAt", updated_at as "updatedAt"`;
       return json(req, res, 201, rows[0]);
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
       const rows = await sql`UPDATE projects SET title = COALESCE(${name}, title), description = COALESCE(${description}, description), data = COALESCE(${JSON.stringify({ instructions, conversationStarters })}::jsonb || data, data), updated_at = now() WHERE id = ${id} AND user_id = ${userId} RETURNING id`;
       return json(req, res, 200, rows[0] || {});
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
       if (!rows[0]) return json(req, res, 404, { error: 'Project not found' });
       return json(req, res, 200, { ok: true });
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 

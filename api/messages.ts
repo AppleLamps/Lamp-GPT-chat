@@ -14,7 +14,7 @@ export default async function handler(req, res) {
       const rows = await sql`INSERT INTO messages (chat_id, role, content) VALUES (${chatId}, ${role}, ${content}) RETURNING id, chat_id, role, content, timestamp`;
       return json(req, res, 201, rows[0]);
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       const rows = await sql`SELECT id, chat_id, role, content, timestamp FROM messages WHERE chat_id = ${chatId} ORDER BY timestamp ASC`;
       return json(req, res, 200, rows);
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 

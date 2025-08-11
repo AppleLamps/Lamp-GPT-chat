@@ -14,7 +14,7 @@ export default async function handler(req, res) {
       const rows = await sql`INSERT INTO users (username, password_hash) VALUES (${username}, ${password_hash}) RETURNING id, username, created_at`;
       return json(req, res, 201, rows[0]);
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       const rows = await sql`SELECT id, username, created_at FROM users ORDER BY id DESC LIMIT 50`;
       return json(req, res, 200, rows);
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 

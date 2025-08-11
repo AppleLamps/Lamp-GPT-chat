@@ -39,7 +39,7 @@ export default async function handler(req, res) {
         return json(req, res, 200, { id: rows[0].id, email: rows[0].email });
       }
     } catch (error) {
-      return json(req, res, 500, { error: error.message });
+      return json(req, res, 500, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
