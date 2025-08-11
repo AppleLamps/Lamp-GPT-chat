@@ -55,13 +55,55 @@ async function main(): Promise<void> {
     updated_at TIMESTAMPTZ DEFAULT now()
   );`;
 
-  await sql`CREATE TABLE IF NOT EXISTS project_history (
-    id SERIAL PRIMARY KEY,
-    project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
-    snapshot JSONB,
-    note TEXT,
-    created_at TIMESTAMPTZ DEFAULT now()
-  );`;
+  // --- Enforce foreign key cascades & NOT NULL constraints on existing tables ---
+
+  // Chats → Users
+  await sql`ALTER TABLE chats ALTER COLUMN user_id SET NOT NULL`;
+  // Replace existing FK (if any) with ON DELETE CASCADE
+  await sql`ALTER TABLE chats DROP CONSTRAINT IF EXISTS chats_user_id_fkey`;
+  await sql`ALTER TABLE chats DROP CONSTRAINT IF EXISTS fk_user`;
+  await sql`ALTER TABLE chats ADD CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE`;
+
+  // Messages → Chats
+  await sql`ALTER TABLE messages ALTER COLUMN chat_id SET NOT NULL`;
+  await sql`ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_chat_id_fkey`;
+  await sql`ALTER TABLE messages DROP CONSTRAINT IF EXISTS fk_chat`;
+  await sql`ALTER TABLE messages ADD CONSTRAINT fk_chat FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE`;
+
+  // Projects.user_id MUST be present
+  await sql`ALTER TABLE projects ALTER COLUMN user_id SET NOT NULL`;
+
+  // Project history must reference a project
+  await sql`ALTER TABLE project_history ALTER COLUMN project_id SET NOT NULL`;
+
+  // Sessions.user_id cannot be null
+  await sql`ALTER TABLE sessions ALTER COLUMN user_id SET NOT NULL`;
+
+  // User API Keys foreign key non-null
+  await sql`ALTER TABLE user_api_keys ALTER COLUMN user_id SET NOT NULL`;
+
+  // project_history table already ensured at top of file (or in earlier migrations)
+
+  // Ensure users.username is unique
+  await sql`DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'users_username_uidx') THEN
+      CREATE UNIQUE INDEX users_username_uidx ON users(username);
+    END IF;
+  END $$;`;
+
+  // Ensure sessions.token is unique
+  await sql`DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'sessions_token_uidx') THEN
+      CREATE UNIQUE INDEX sessions_token_uidx ON sessions(token);
+    END IF;
+  END $$;`;
+
+  // Make sure users.email cannot be NULL
+  await sql`ALTER TABLE users ALTER COLUMN email SET NOT NULL`;
+
+  // Indexes for foreign keys
+  await sql`CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_project_history_project_id ON project_history(project_id);`;
 
   console.log('Schema updated.');
 }

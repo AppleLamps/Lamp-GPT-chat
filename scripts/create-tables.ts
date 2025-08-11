@@ -19,7 +19,7 @@ async function main(): Promise<void> {
 
   await sql`CREATE TABLE IF NOT EXISTS chats (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -27,15 +27,17 @@ async function main(): Promise<void> {
 
   await sql`CREATE TABLE IF NOT EXISTS messages (
     id SERIAL PRIMARY KEY,
-    chat_id INTEGER REFERENCES chats(id),
+    chat_id INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
     role VARCHAR(20),
     content TEXT,
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
   );`;
 
+  await sql`CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);`;
+
   await sql`CREATE TABLE IF NOT EXISTS sessions (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token VARCHAR(255) UNIQUE NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -43,7 +45,7 @@ async function main(): Promise<void> {
 
   await sql`CREATE TABLE IF NOT EXISTS user_api_keys (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     provider VARCHAR(64) NOT NULL,
     secret_encrypted TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -52,7 +54,7 @@ async function main(): Promise<void> {
 
   await sql`CREATE TABLE IF NOT EXISTS projects (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     description TEXT,
     data JSONB DEFAULT '{}'::jsonb,
@@ -70,6 +72,16 @@ async function main(): Promise<void> {
     active_project_id INTEGER REFERENCES projects(id),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
   );`;
+
+  await sql`CREATE TABLE IF NOT EXISTS project_history (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    snapshot JSONB,
+    note TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+  );`;
+
+  await sql`CREATE INDEX IF NOT EXISTS idx_project_history_project_id ON project_history(project_id);`;
 
   console.log('All tables created or already exist.');
 }
