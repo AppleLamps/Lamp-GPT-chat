@@ -31,8 +31,6 @@ export default async function handler(req, res) {
         );
     `;
 
-    // ... (create other tables for projects, settings, etc.)
-
     res.status(200).json({ message: 'Tables created successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
