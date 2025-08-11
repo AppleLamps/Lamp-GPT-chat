@@ -1,7 +1,8 @@
-import { sql } from '../lib/db';
+import { getSql } from '../lib/db';
 
 export default async function handler(req, res) {
   try {
+    const sql = getSql();
     await sql`CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       username VARCHAR(255) UNIQUE NOT NULL,
