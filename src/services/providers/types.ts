@@ -2,14 +2,25 @@
 
 export type MessageRole = "system" | "user" | "assistant";
 
-export type MessageContent = string | {
-  type: "text" | "image_url";
-  text?: string;
-  image_url?: {
+export interface CacheControl {
+  type: "ephemeral";
+}
+
+export interface TextPart {
+  type: "text";
+  text: string;
+  cache_control?: CacheControl;
+}
+
+export interface ImagePart {
+  type: "image_url";
+  image_url: {
     url: string;
     detail: "high" | "low" | "auto";
   };
-}[];
+}
+
+export type MessageContent = string | Array<TextPart | ImagePart>;
 
 export interface Message {
   role: MessageRole;
@@ -28,6 +39,7 @@ export interface ChatCompletionRequest {
   temperature?: number;
   max_tokens?: number;
   stream?: boolean;
+  usage?: { include: boolean };
 }
 
 export interface ChatCompletionResponse {

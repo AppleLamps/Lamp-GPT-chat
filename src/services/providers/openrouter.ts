@@ -6,6 +6,7 @@ import {
   Message,
   StreamCallbacks,
   AIServiceProvider,
+  TextPart,
 } from "./types";
 
 // Endpoint
@@ -44,11 +45,36 @@ export const openRouterProvider: AIServiceProvider = {
     let retries = 0; let lastError: any = null;
     while (retries <= MAX_RETRIES) {
       try {
+        // Insert cache_control breakpoints for large text bodies in system/user messages
+        const cachedMessages: Message[] = messages.map((m) => {
+          if (Array.isArray(m.content)) {
+            // If content is multipart, add ephemeral cache_control to the last large text part
+            const parts = m.content.map((p) => ({ ...p }));
+            for (let i = parts.length - 1; i >= 0; i--) {
+              const part = parts[i] as TextPart;
+              if (part.type === "text" && typeof part.text === "string" && part.text.length > 4000) {
+                part.cache_control = { type: "ephemeral" };
+                break;
+              }
+            }
+            return { ...m, content: parts };
+          }
+          if (typeof m.content === "string" && m.content.length > 4000) {
+            // Convert to multipart to attach cache_control for large strings
+            const parts: TextPart[] = [
+              { type: "text", text: m.content, cache_control: { type: "ephemeral" } },
+            ];
+            return { ...m, content: parts } as Message;
+          }
+          return m;
+        });
+
         const requestBody: ChatCompletionRequest = {
           model: options.model || "x-ai/grok-4",
-          messages,
+          messages: cachedMessages,
           temperature: options.temperature ?? 0.7,
           max_tokens: options.max_tokens ?? 8192,
+          usage: { include: true },
         };
 
         console.log("OpenRouter send (attempt " + (retries + 1) + "):", prepareRequestLog(OPENROUTER_URL, requestBody));
@@ -80,12 +106,34 @@ export const openRouterProvider: AIServiceProvider = {
     let retries = 0; let aborted = false;
     while (retries <= MAX_RETRIES && !aborted) {
       try {
+        const cachedMessages: Message[] = messages.map((m) => {
+          if (Array.isArray(m.content)) {
+            const parts = m.content.map((p) => ({ ...p }));
+            for (let i = parts.length - 1; i >= 0; i--) {
+              const part = parts[i] as TextPart;
+              if (part.type === "text" && typeof part.text === "string" && part.text.length > 4000) {
+                part.cache_control = { type: "ephemeral" };
+                break;
+              }
+            }
+            return { ...m, content: parts };
+          }
+          if (typeof m.content === "string" && m.content.length > 4000) {
+            const parts: TextPart[] = [
+              { type: "text", text: m.content, cache_control: { type: "ephemeral" } },
+            ];
+            return { ...m, content: parts } as Message;
+          }
+          return m;
+        });
+
         const requestBody: ChatCompletionRequest = {
           model: options.model || "x-ai/grok-4",
-          messages,
+          messages: cachedMessages,
           temperature: options.temperature ?? 0.7,
           max_tokens: options.max_tokens ?? 8192,
           stream: true,
+          usage: { include: true },
         };
 
         console.log("OpenRouter stream (attempt " + (retries + 1) + "):", prepareRequestLog(OPENROUTER_URL, requestBody));
