@@ -4,7 +4,9 @@ import { getSql } from '../lib/db';
 import { json, readJson } from './_utils';
 
 export default async function handler(req, res) {
-  const sql = getSql();
+  // Initialize database connection inside try/catch so we can gracefully
+  // handle missing DATABASE_URL or connection errors in production (e.g. Vercel)
+  let sql: ReturnType<typeof getSql>;
 
   if (req.method === 'POST') {
     const body = await readJson<{ action: 'signup' | 'signin'; email: string; password: string }>(req);
@@ -12,6 +14,8 @@ export default async function handler(req, res) {
     if (!action || !email || !password) return json(req, res, 400, { error: 'action, email, password required' });
 
     try {
+      // Database connection may throw if env vars are missing – catch and return JSON instead of a plain 500 text response
+      sql = getSql();
       if (action === 'signup') {
         const hash = await bcrypt.hash(password, 10);
         // If account exists, return 409
