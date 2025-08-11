@@ -93,6 +93,13 @@ const STORAGE_KEYS = {
   CURRENT_CHAT_ID: "currentChatId"
 };
 
+// Small safe wrapper for localStorage JSON writes
+const storeInLocalStorage = (key: string, value: unknown) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+};
+
 // Helper functions
 const generateId = (prefix: string = ''): string => {
   // Add a random component to ensure uniqueness even if two IDs are generated in the same millisecond
@@ -388,10 +395,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   };
 
   // Save current chat (ensures an ID exists and writes synchronously to localStorage too)
-  const storeInLocalStorage = (key: string, value: unknown) => {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
-  };
-
   const saveCurrentChat = async () => {
     if (messages.length <= 1) return; // Ignore empty/welcome-only chats
 
