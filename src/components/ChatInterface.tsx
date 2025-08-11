@@ -4,17 +4,10 @@ import ChatHeader from "./ChatHeader";
 import ChatSidebar from "./ChatSidebar";
 import ChatMessages from "./ChatMessages";
 import ChatControls from "./ChatControls";
-import { ChatProvider } from "@/contexts/ChatContext";
-import { SettingsProvider, useSettings } from "@/contexts/SettingsContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { cn } from "@/lib/utils";
 
-/**
- * Helper consumer component to access settings context
- */
-const SettingsConsumer = ({ children }: { children: (settings: ReturnType<typeof useSettings>) => React.ReactNode }) => {
-  const settings = useSettings();
-  return <>{children(settings)}</>;
-};
+
 
 /**
  * Main ChatInterface component that orchestrates the UI layout
@@ -66,96 +59,85 @@ const ChatInterface: React.FC = () => {
     setSidebarVisible(!sidebarVisible);
   };
 
+  const settingsProps = useSettings();
+  
   return (
-    <SettingsProvider>
-      <SettingsConsumer>
-        {(settingsProps) => (
-          <ChatProvider 
-            apiKey={settingsProps.apiKey}
-            modelTemperature={settingsProps.modelTemperature}
-            maxTokens={settingsProps.maxTokens}
-            currentModel={settingsProps.currentModel}
-          >
-            <div className="flex h-screen bg-white dark:bg-gray-900 overflow-hidden">
-              {/* Responsive layout with different behavior for mobile and desktop */}
-              {isMobile ? (
-                // Mobile layout - sidebar is fixed position and overlays
-                <>
-                  {/* Backdrop overlay (z-60) - higher than header but lower than sidebar */}
-                  <div className={cn(
-                    "fixed inset-0 z-60 bg-black/50 transition-opacity duration-300 ease-in-out", 
-                    sidebarVisible ? "opacity-100" : "opacity-0 pointer-events-none",
-                  )}>
-                    {/* Clicks outside sidebar close it */}
-                    <div 
-                      className="absolute inset-0" 
-                      onClick={toggleSidebar}
-                      aria-hidden="true"
-                    ></div>
-                  </div>
-                  
-                  {/* Sidebar (z-70) - highest element to appear above everything */}
-                  <div className={cn(
-                    "fixed inset-y-0 left-0 z-70 w-64 transition-transform duration-300 ease-in-out",
-                    sidebarVisible ? "translate-x-0" : "-translate-x-full"
-                  )}>
-                    <ChatSidebar 
-                      sidebarVisible={sidebarVisible} 
-                      formatDate={formatDate} 
-                      toggleSidebar={toggleSidebar}
-                    />
-                  </div>
-                  
-                  <div className="flex-1 flex flex-col h-full">
-                    {/* Header with conditional z-index:
-                        - When sidebar is visible: z-20 (below overlay elements)
-                        - When sidebar is closed: z-50 (above most content) */}
-                    <div className={cn(
-                      "sticky top-0 w-full bg-white dark:bg-gray-900",
-                      sidebarVisible ? "z-20" : "z-50"
-                    )}>
-                      <ChatHeader toggleSidebar={toggleSidebar} />
-                    </div>
-                    <ChatMessages />
-                    <ChatControls />
-                  </div>
-                </>
-              ) : (
-                // Desktop layout - sidebar pushes content
-                <>
-                  <div className={cn(
-                    "transition-all duration-300 ease-in-out",
-                    sidebarVisible ? "w-64 shrink-0" : "w-0 shrink-0 overflow-hidden"
-                  )}>
-                    <ChatSidebar 
-                      sidebarVisible={sidebarVisible} 
-                      formatDate={formatDate} 
-                      toggleSidebar={toggleSidebar}
-                    />
-                  </div>
-                  
-                  <div className="flex-1 flex flex-col h-full transition-all duration-300 ease-in-out">
-                    <ChatHeader toggleSidebar={toggleSidebar} />
-                    <ChatMessages />
-                    <ChatControls />
-                  </div>
-                </>
-              )}
-
-              {/* Settings Panel - Now using the context value */}
-              <SettingsPanel
-                isOpen={settingsProps.settingsOpen}
-                onClose={() => settingsProps.setSettingsOpen(false)}
-                apiKey={settingsProps.apiKey}
-                temperature={settingsProps.modelTemperature}
-                maxTokens={settingsProps.maxTokens}
-                onSave={settingsProps.handleSaveSettings}
-              />
+    <div className="flex h-screen bg-white dark:bg-gray-900 overflow-hidden">
+      {/* Responsive layout with different behavior for mobile and desktop */}
+      {isMobile ? (
+        // Mobile layout - sidebar is fixed position and overlays
+        <>
+          {/* Backdrop overlay (z-60) - higher than header but lower than sidebar */}
+          <div className={cn(
+            "fixed inset-0 z-60 bg-black/50 transition-opacity duration-300 ease-in-out", 
+            sidebarVisible ? "opacity-100" : "opacity-0 pointer-events-none",
+          )}>
+            {/* Clicks outside sidebar close it */}
+            <div 
+              className="absolute inset-0" 
+              onClick={toggleSidebar}
+              aria-hidden="true"
+            ></div>
+          </div>
+          
+          {/* Sidebar (z-70) - highest element to appear above everything */}
+          <div className={cn(
+            "fixed inset-y-0 left-0 z-70 w-64 transition-transform duration-300 ease-in-out",
+            sidebarVisible ? "translate-x-0" : "-translate-x-full"
+          )}>
+            <ChatSidebar 
+              sidebarVisible={sidebarVisible} 
+              formatDate={formatDate} 
+              toggleSidebar={toggleSidebar}
+            />
+          </div>
+          
+          <div className="flex-1 flex flex-col h-full">
+            {/* Header with conditional z-index:
+                - When sidebar is visible: z-20 (below overlay elements)
+                - When sidebar is closed: z-50 (above most content) */}
+            <div className={cn(
+              "sticky top-0 w-full bg-white dark:bg-gray-900",
+              sidebarVisible ? "z-20" : "z-50"
+            )}>
+              <ChatHeader toggleSidebar={toggleSidebar} />
             </div>
-          </ChatProvider>
-        )}
-      </SettingsConsumer>
-    </SettingsProvider>
+            <ChatMessages />
+            <ChatControls />
+          </div>
+        </>
+      ) : (
+        // Desktop layout - sidebar pushes content
+        <>
+          <div className={cn(
+            "transition-all duration-300 ease-in-out",
+            sidebarVisible ? "w-64 shrink-0" : "w-0 shrink-0 overflow-hidden"
+          )}>
+            <ChatSidebar 
+              sidebarVisible={sidebarVisible} 
+              formatDate={formatDate} 
+              toggleSidebar={toggleSidebar}
+            />
+          </div>
+          
+          <div className="flex-1 flex flex-col h-full transition-all duration-300 ease-in-out">
+            <ChatHeader toggleSidebar={toggleSidebar} />
+            <ChatMessages />
+            <ChatControls />
+          </div>
+        </>
+      )}
+
+      {/* Settings Panel - Now using the context value */}
+      <SettingsPanel
+        isOpen={settingsProps.settingsOpen}
+        onClose={() => settingsProps.setSettingsOpen(false)}
+        apiKey={settingsProps.apiKey}
+        temperature={settingsProps.modelTemperature}
+        maxTokens={settingsProps.maxTokens}
+        onSave={settingsProps.handleSaveSettings}
+      />
+    </div>
   );
 };
 

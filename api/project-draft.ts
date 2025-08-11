@@ -5,7 +5,13 @@ export default async function handler(req, res) {
   const sql = getSql();
 
   if (req.method === 'GET') {
-    const userId = Number(req.query.userId);
+    const cookie = req.headers.cookie || '';
+    const session = (cookie.match(/(?:^|; )session=([^;]+)/) || [])[1];
+    const meRow = session ? await sql`SELECT user_id FROM sessions WHERE token = ${decodeURIComponent(session)} AND (expires_at IS NULL OR expires_at > now())` : [];
+    const me = meRow[0]?.user_id || null;
+
+    const param = String(req.query.userId || '');
+    const userId = param === 'me' ? (me || 0) : Number(param);
     if (!userId) return json(req, res, 400, { error: 'userId required' });
     const rows = await sql`SELECT draft_project FROM user_settings WHERE user_id = ${userId}`;
     return json(req, res, 200, rows[0]?.draft_project || null);

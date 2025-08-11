@@ -211,21 +211,82 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           if (!cancelled) addWelcomeMessage();
           return;
         }
+
+        // Load active project if one is set in user settings
+        try {
+          const settingsRes = await fetch('/api/user-settings?userId=me');
+          if (settingsRes.ok) {
+            const settings = await settingsRes.json();
+            if (settings.active_project_id && !sessionStorage.getItem('activeCustomBot')) {
+              // Load the active project data
+              const projectsRes = await fetch('/api/projects?userId=me');
+              if (projectsRes.ok) {
+                const projects = await projectsRes.json();
+                const activeProject = projects.find((p: any) => Number(p.id) === Number(settings.active_project_id));
+                if (activeProject) {
+                  const botData = {
+                    id: String(activeProject.id),
+                    name: activeProject.name,
+                    description: activeProject.description || '',
+                    instructions: activeProject.instructions || '',
+                    conversationStarters: activeProject.conversationStarters || []
+                  };
+                  sessionStorage.setItem('activeCustomBot', JSON.stringify(botData));
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to load active project:', e);
+        }
+
         const r = await fetch(`/api/chats?userId=me`);
         if (!r.ok) { if (!cancelled) addWelcomeMessage(); return; }
         const chats = await r.json();
         if (cancelled) return;
-        setSavedChats(chats.map((c: any) => ({ id: String(c.id), title: c.title || 'New Chat', messages: [], lastUpdated: new Date(c.updated_at || c.updatedAt || Date.now()) })));
-        if (chats[0]) {
-          const chatId = String(chats[0].id);
-          setCurrentChatId(chatId);
-          const msgsRes = await fetch(`/api/messages?chatId=${chatId}`);
-          if (msgsRes.ok) {
-            const rows = await msgsRes.json();
-            if (!cancelled) setMessages(rows.map((m: any) => ({ id: `db_${m.id}`, role: m.role, content: m.content, timestamp: new Date(m.timestamp) })));
-          } else {
-            if (!cancelled) addWelcomeMessage();
-          }
+        
+        // Load all chats with their messages from the database
+        const chatsWithMessages = await Promise.all(
+          chats.map(async (c: any) => {
+            const chatId = String(c.id);
+            try {
+              const msgsRes = await fetch(`/api/messages?chatId=${chatId}`);
+              let messages: Message[] = [];
+              if (msgsRes.ok) {
+                const rows = await msgsRes.json();
+                messages = rows.map((m: any) => ({ 
+                  id: `db_${m.id}`, 
+                  role: m.role, 
+                  content: m.content, 
+                  timestamp: new Date(m.timestamp) 
+                }));
+              }
+              return {
+                id: chatId,
+                title: c.title || 'New Chat',
+                messages,
+                lastUpdated: new Date(c.updated_at || c.updatedAt || Date.now())
+              };
+            } catch (e) {
+              console.warn(`Failed to load messages for chat ${chatId}:`, e);
+              return {
+                id: chatId,
+                title: c.title || 'New Chat',
+                messages: [],
+                lastUpdated: new Date(c.updated_at || c.updatedAt || Date.now())
+              };
+            }
+          })
+        );
+        
+        if (cancelled) return;
+        setSavedChats(chatsWithMessages);
+        
+        // Load the most recent chat if available
+        if (chatsWithMessages[0]) {
+          const mostRecentChat = chatsWithMessages[0];
+          setCurrentChatId(mostRecentChat.id);
+          setMessages(mostRecentChat.messages);
         } else {
           if (!cancelled) addWelcomeMessage();
         }
@@ -234,30 +295,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       }
     })();
 
-    // On mount, if there were any locally stored messages, normalize greeting (defensive)
-    const normalizeGreeting = (msgs: Message[]): Message[] => {
-      const oldText = "Hello! I'm Grok, your AI assistant. How can I help you today?";
-      const newText = "Hello! I'm your AI assistant. How can I help you today?";
-      let changed = false;
-      const mapped = msgs.map(m => {
-        if (m.role === 'assistant' && typeof m.content === 'string' && m.content.trim() === oldText) {
-          changed = true;
-          return { ...m, content: newText };
-        }
-        return m;
-      });
-      if (changed) {
-        try { storeInLocalStorage(STORAGE_KEYS.MESSAGES, mapped); } catch {}
-      }
-      return mapped;
-    };
-    try {
-      const raw = localStorage.getItem(STORAGE_KEYS.MESSAGES);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Message[];
-        if (!cancelled && parsed.length > 0) setMessages(normalizeGreeting(parsed));
-      }
-    } catch {}
+    // Remove localStorage message loading to prevent conflicts with database
 
     return () => { cancelled = true; };
   }, []);
@@ -277,11 +315,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     };
   }, []);
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      storeInLocalStorage(STORAGE_KEYS.MESSAGES, messages);
-    }
-  }, [messages]);
+  // Remove localStorage persistence to avoid conflicts with database
+  // useEffect(() => {
+  //   if (messages.length > 0) {
+  //     storeInLocalStorage(STORAGE_KEYS.MESSAGES, messages);
+  //   }
+  // }, [messages]);
 
   // No localStorage persistence; chats are persisted server-side
 
@@ -394,27 +433,34 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     return title.length > 50 ? `${title.substring(0, 50)}...` : title;
   };
 
-  // Save current chat (ensures an ID exists and writes synchronously to localStorage too)
+  // Save current chat (ensures an ID exists and saves to database)
   const saveCurrentChat = async () => {
     if (messages.length <= 1) return; // Ignore empty/welcome-only chats
 
     const chatTitle = getChatTitle(messages);
+    // Get session data for userId
+    const sess = await fetch('/api/session').then(r => r.json()).catch(() => ({ userId: null }));
+    if (!sess.userId) return;
+
     // Ensure we have a chat ID (create in DB if missing)
     let chatId = currentChatId;
     if (!chatId) {
-      const userIdRaw = localStorage.getItem('userId');
-      const userId = userIdRaw ? parseInt(userIdRaw, 10) : 0;
-      if (userId) {
-        const r = await fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, title: chatTitle }) });
+      try {
+        const r = await fetch('/api/chats', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ userId: sess.userId, title: chatTitle }) 
+        });
         if (r.ok) {
           const created = await r.json();
           chatId = String(created.id);
           setCurrentChatId(chatId);
         }
+      } catch (e) {
+        console.error('Failed to create chat in database:', e);
+        return;
       }
     }
-
-    const existingChatIndex = chatId ? savedChats.findIndex(chat => chat.id === chatId) : -1;
 
     // Capture currently active custom bot (per chat) if present
     let botInfo: SavedBotInfo | undefined;
@@ -435,84 +481,120 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       console.warn('Failed to parse activeCustomBot for saving with chat:', e);
     }
 
+    const existingChatIndex = chatId ? savedChats.findIndex(chat => chat.id === chatId) : -1;
+    const updatedChatData = {
+      id: chatId,
+      title: chatTitle,
+      messages: [...messages],
+      lastUpdated: new Date(),
+      bot: botInfo,
+    };
+
     if (existingChatIndex >= 0) {
       // Update existing chat
       const updatedChats = [...savedChats];
       updatedChats[existingChatIndex] = {
         ...updatedChats[existingChatIndex],
-        title: chatTitle,
-        messages: [...messages],
-        lastUpdated: new Date(),
+        ...updatedChatData,
         bot: botInfo ?? updatedChats[existingChatIndex].bot,
       };
       setSavedChats(updatedChats);
-          // Persist new assistant message to DB
-          if (chatId) {
-            const last = messages[messages.length - 1];
-            if (last) {
-              fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chatId: Number(chatId), role: last.role, content: typeof last.content === 'string' ? last.content : JSON.stringify(last.content) }) });
-            }
-          }
     } else {
       // Add new chat
-      const newSaved = {
-        id: chatId,
-        title: chatTitle,
-        messages: [...messages],
-        lastUpdated: new Date(),
-        bot: botInfo,
-      };
-      const updatedChats = [...savedChats, newSaved];
+      const updatedChats = [...savedChats, updatedChatData];
       setSavedChats(updatedChats);
-          if (chatId) {
-            const last = messages[messages.length - 1];
-            if (last) {
-              fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chatId: Number(chatId), role: last.role, content: typeof last.content === 'string' ? last.content : JSON.stringify(last.content) }) });
-            }
+    }
+
+    // Save all messages to database
+    if (chatId) {
+      try {
+        // Get existing messages from database to avoid duplicates
+        const existingMsgsRes = await fetch(`/api/messages?chatId=${chatId}`);
+        const existingMsgs = existingMsgsRes.ok ? await existingMsgsRes.json() : [];
+        const existingMsgSet = new Set(existingMsgs.map((m: any) => `${m.role}:${typeof m.content === 'string' ? m.content.substring(0, 50) : JSON.stringify(m.content).substring(0, 50)}`));
+
+        // Only save new messages that aren't already in the database
+        for (const message of messages) {
+          if (message.role === 'system') continue; // Don't save system messages
+          
+          const messageKey = `${message.role}:${typeof message.content === 'string' ? message.content.substring(0, 50) : JSON.stringify(message.content).substring(0, 50)}`;
+          if (!existingMsgSet.has(messageKey)) {
+            await fetch('/api/messages', { 
+              method: 'POST', 
+              headers: { 'Content-Type': 'application/json' }, 
+              body: JSON.stringify({ 
+                chatId: Number(chatId), 
+                role: message.role, 
+                content: typeof message.content === 'string' ? message.content : JSON.stringify(message.content) 
+              }) 
+            });
           }
+        }
+      } catch (e) {
+        console.error('Failed to save messages to database:', e);
+      }
     }
   };
 
   // Load saved chat
-  const loadSavedChat = (chatId: string) => {
+  const loadSavedChat = async (chatId: string) => {
     if (isProcessing) return;
 
     const chatToLoad = savedChats.find(chat => chat.id === chatId);
     if (!chatToLoad) return;
 
     // Save current chat before switching
-    saveCurrentChat();
+    await saveCurrentChat();
 
-    // Clear any existing custom bot data to prevent conflicts
-    sessionStorage.removeItem('activeCustomBot');
-    localStorage.removeItem('currentCustomBot');
-
-    // Load selected chat
-    setMessages(chatToLoad.messages);
-    setCurrentChatId(chatId);
-    localStorage.setItem(STORAGE_KEYS.CURRENT_CHAT_ID, chatId);
-
-    // Restore associated project/bot if it was saved with this chat
-    if (chatToLoad.bot) {
-      try {
-        sessionStorage.setItem('activeCustomBot', JSON.stringify(chatToLoad.bot));
-      } catch (e) {
-        console.warn('Failed to restore activeCustomBot from saved chat:', e);
-      }
+    // If the chat already has messages loaded, use them directly
+    if (chatToLoad.messages && chatToLoad.messages.length > 0) {
+      setMessages(chatToLoad.messages);
+      setCurrentChatId(chatId);
     } else {
-      // Backward-compat: attempt to infer minimal bot info from messages if present (legacy chats)
-      const systemMessage = chatToLoad.messages.find(msg => msg.role === 'system');
-      if (systemMessage) {
-        const assistantMessage = chatToLoad.messages.find(msg => msg.role === 'assistant');
-        const botNameMatch = assistantMessage?.content?.toString().match(/I'm ([^.]+)/);
-        const botName = botNameMatch ? botNameMatch[1].trim() : 'Custom Bot';
-        const minimumBotInfo = {
-          name: botName,
-          instructions: systemMessage.content as string
-        };
-        try { sessionStorage.setItem('activeCustomBot', JSON.stringify(minimumBotInfo)); } catch {}
+      // Otherwise, load messages from database
+      try {
+        const msgsRes = await fetch(`/api/messages?chatId=${chatId}`);
+        if (msgsRes.ok) {
+          const rows = await msgsRes.json();
+          const messages = rows.map((m: any) => ({ 
+            id: `db_${m.id}`, 
+            role: m.role, 
+            content: m.content, 
+            timestamp: new Date(m.timestamp) 
+          }));
+          
+          setMessages(messages);
+          setCurrentChatId(chatId);
+          
+          // Update the saved chat with loaded messages
+          setSavedChats(prev => prev.map(chat => 
+            chat.id === chatId ? { ...chat, messages } : chat
+          ));
+        } else {
+          console.warn(`Failed to load messages for chat ${chatId}`);
+          setMessages([]);
+          setCurrentChatId(chatId);
+        }
+      } catch (e) {
+        console.error(`Error loading messages for chat ${chatId}:`, e);
+        setMessages([]);
+        setCurrentChatId(chatId);
       }
     }
+
+    // Only restore bot from saved chat if this chat has a specific bot AND there's no currently active project
+    if (chatToLoad.bot) {
+      // If there's a currently active project, don't override it unless this chat specifically uses a different bot
+      const currentActiveBot = sessionStorage.getItem('activeCustomBot');
+      if (!currentActiveBot || (currentActiveBot && chatToLoad.bot.id)) {
+        try {
+          sessionStorage.setItem('activeCustomBot', JSON.stringify(chatToLoad.bot));
+        } catch (e) {
+          console.warn('Failed to restore activeCustomBot from saved chat:', e);
+        }
+      }
+    }
+    // Don't clear active project when loading chats that don't have a specific bot
   };
 
   // Delete saved chat
@@ -1008,12 +1090,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     // Reset chat ID
     setCurrentChatId(null);
 
-    // Clear localStorage data related to current chat
-    localStorage.removeItem(STORAGE_KEYS.CURRENT_CHAT_ID);
-    localStorage.removeItem(STORAGE_KEYS.MESSAGES);
+    // Clear any localStorage data that might conflict
 
-    // Clear any active custom bot data
-    sessionStorage.removeItem('activeCustomBot');
+    // DON'T clear the active custom bot data - keep the selected project active
+    // sessionStorage.removeItem('activeCustomBot'); // <-- Removed this line
 
     // Add a fresh welcome message
     addWelcomeMessage();

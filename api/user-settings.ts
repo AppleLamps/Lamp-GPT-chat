@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     const userId = param === 'me' ? (me || 0) : Number(param);
     if (!userId) return json(req, res, 400, { error: 'userId required' });
     try {
-      const rows = await sql`SELECT model_temperature, max_tokens, current_model, theme FROM user_settings WHERE user_id = ${userId}`;
+      const rows = await sql`SELECT model_temperature, max_tokens, current_model, theme, active_project_id FROM user_settings WHERE user_id = ${userId}`;
       if (!rows[0]) return json(req, res, 200, {});
       return json(req, res, 200, rows[0]);
     } catch (error) {

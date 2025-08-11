@@ -39,8 +39,21 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onEdit, onDelete }) 
   // Navigate to chat with the custom bot instructions
   const handleUseBot = async () => {
     try {
+      // Save the active project ID to backend
       await fetch('/api/user-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'me', active_project_id: Number(project.id) }) });
-    } catch {}
+      
+      // Load the project into sessionStorage so it becomes the active bot
+      const botData = {
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        instructions: project.instructions,
+        conversationStarters: project.conversationStarters
+      };
+      sessionStorage.setItem('activeCustomBot', JSON.stringify(botData));
+    } catch (error) {
+      console.error('Failed to set active project:', error);
+    }
     navigate('/');
   };
 
