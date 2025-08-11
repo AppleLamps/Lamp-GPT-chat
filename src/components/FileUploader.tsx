@@ -387,11 +387,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           !disabled && files.length < maxFiles && !processing && "cursor-pointer",
           "h-28"
         )}
-        aria-disabled={disabled || processing || files.length >= maxFiles}
-        role="button"
-        tabIndex={0}
+        aria-live="polite"
       >
-        <input {...getInputProps()} aria-label="File input" />
+        <input {...getInputProps()} aria-label="File input" className="sr-only" />
 
         {isDragActive ? (
           isDragAccept ? (
@@ -503,12 +501,14 @@ const FileUploader: React.FC<FileUploaderProps> = ({
               Processing files... ({processingProgress}%)
             </span>
           </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-2" role="progressbar" aria-valuenow={processingProgress} aria-valuemin={0} aria-valuemax={100}>
-            <div
-              className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
-              style={{ width: `${processingProgress}%` }}
-            />
-          </div>
+          <label htmlFor="file-processing-progress" className="sr-only">File processing progress</label>
+          <progress
+            id="file-processing-progress"
+            className="w-full h-1.5 mt-2"
+            value={processingProgress}
+            max={100}
+            aria-valuetext={`${processingProgress}%`}
+          />
         </div>
       )}
 

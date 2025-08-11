@@ -941,12 +941,12 @@ const Projects: React.FC = () => {
                       onChange={handleInputChange}
                       placeholder="Be a helpful assistant that..."
                       rows={8}
-                      maxLength={4000}
+                      maxLength={10000}
                       className={`w-full px-4 py-3 border ${validationErrors.instructions ? 'border-red-500 dark:border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-emerald-500 focus:border-emerald-500'} rounded-lg shadow-sm focus:outline-none focus:ring-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-all`}
                       aria-describedby={validationErrors.instructions ? "instructions-error" : undefined}
                     />
                     <div className="absolute right-4 bottom-3 text-xs text-gray-400">
-                      {formData.instructions.length}/4000
+                      {formData.instructions.length}/10000
                     </div>
                   </div>
                   {validationErrors.instructions && (
