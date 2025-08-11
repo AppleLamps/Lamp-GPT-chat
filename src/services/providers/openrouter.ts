@@ -201,7 +201,12 @@ export const openRouterProvider: AIServiceProvider = {
       messages.push({ role: 'system', content: opts.projectInstructions as string });
     }
     messages.push(...opts.messages.map(m => ({ role: m.role as any, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) })));
-    const apiKey = localStorage.getItem('apiKey') || '';
+    // Retrieve API key from backend using session
+    let apiKey = '';
+    try {
+      const r = await fetch('/api/api-keys?userId=me&provider=openrouter');
+      if (r.ok) { const d = await r.json(); apiKey = d.secret || ''; }
+    } catch {}
     if (!apiKey) throw new Error("API Key is required. Please set your API key in settings.");
     const content = await this.sendMessage(messages, apiKey, { max_tokens: opts.max_tokens, temperature: opts.temperature, model: opts.model });
     return { choices: [{ message: { content } }], quick_replies: [] };

@@ -8,7 +8,7 @@ export function ThemeToggle() {
 
   useEffect(() => {
     // Check for system preference or saved preference
-    const savedTheme = localStorage.getItem('theme') as Theme | null;
+  const savedTheme = null as Theme | null;
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     
     const initialTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
@@ -20,7 +20,7 @@ export function ThemeToggle() {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
     applyTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
+    fetch('/api/user-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'me', theme: newTheme }) }).catch(() => {});
   };
 
   const applyTheme = (selectedTheme: Theme) => {

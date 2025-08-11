@@ -25,10 +25,10 @@ const Projects: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addProject, getProject, updateProject } = useProjects();
-  const [apiKey, setApiKey] = useState<string>(localStorage.getItem("apiKey") || "");
-  const [temperature, setTemperature] = useState<number>(parseFloat(localStorage.getItem("temperature") || "0.7"));
-  const [maxTokens, setMaxTokens] = useState<number>(parseInt(localStorage.getItem("maxTokens") || "8192"));
-  const [currentModel, setCurrentModel] = useState<string>(localStorage.getItem("currentModel") || "x-ai/grok-4");
+  const [apiKey, setApiKey] = useState<string>("");
+  const [temperature, setTemperature] = useState<number>(0.7);
+  const [maxTokens, setMaxTokens] = useState<number>(8192);
+  const [currentModel, setCurrentModel] = useState<string>("x-ai/grok-4");
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'create' | 'configure'>('configure');
   const [activeRightTab, setActiveRightTab] = useState<'preview' | 'assistant'>('preview');
@@ -267,7 +267,8 @@ const Projects: React.FC = () => {
   // Load draft from localStorage if in create mode
   useEffect(() => {
     if (!isEditMode) {
-      const savedDraft = localStorage.getItem('project_draft');
+      let savedDraft: string | null = null;
+      try { const r = await fetch(`/api/project-draft?userId=me`); if (r.ok) savedDraft = JSON.stringify(await r.json()); } catch {}
       if (savedDraft) {
         try {
           const parsedDraft = JSON.parse(savedDraft);
@@ -286,7 +287,7 @@ const Projects: React.FC = () => {
       const autosaveTimerId = setTimeout(() => {
         if (hasUnsavedChanges) {
           setAutosaveStatus('saving');
-          localStorage.setItem('project_draft', JSON.stringify(formData));
+          fetch('/api/project-draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'me', draft: formData }) });
           setTimeout(() => {
             setAutosaveStatus('saved');
             setTimeout(() => {
@@ -302,7 +303,7 @@ const Projects: React.FC = () => {
 
   // Clear draft on successful submission
   const clearDraft = () => {
-    localStorage.removeItem('project_draft');
+    fetch('/api/project-draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'me', draft: null }) });
   };
 
   // Advance to next step

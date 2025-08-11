@@ -24,8 +24,8 @@
     <meta name="twitter:image" content="/og-image.png" />
     <script>
       if (
-        localStorage.getItem('theme') === 'dark' ||
-        (!localStorage.getItem('theme') &&
+        (/* theme chosen via server settings or system */ false) ||
+        (
           window.matchMedia('(prefers-color-scheme: dark)').matches)
       ) {
         document.documentElement.classList.add('dark');

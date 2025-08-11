@@ -86,7 +86,7 @@ interface ChatContextType {
 // Create context
 export const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-// Storage keys for consistency
+// Storage keys kept only for legacy transitions (no longer used for persistence)
 const STORAGE_KEYS = {
   MESSAGES: "chatMessages",
   SAVED_CHATS: "savedChats",
@@ -101,23 +101,7 @@ const generateId = (prefix: string = ''): string => {
   return `${prefix}${timestamp}-${randomStr}`;
 };
 
-const storeInLocalStorage = <T,>(key: string, value: T): void => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error(`Error storing ${key} in localStorage:`, error);
-  }
-};
-
-const retrieveFromLocalStorage = <T,>(key: string, defaultValue: T): T => {
-  try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : defaultValue;
-  } catch (error) {
-    console.error(`Error retrieving ${key} from localStorage:`, error);
-    return defaultValue;
-  }
-};
+// Legacy helpers removed – persistence is server-side now
 
 // Context provider
 interface ChatProviderProps {
@@ -136,17 +120,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   currentModel
 }) => {
   // State
-  const [messages, setMessages] = useState<Message[]>(() =>
-    retrieveFromLocalStorage<Message[]>(STORAGE_KEYS.MESSAGES, [])
-  );
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState<Message | null>(null);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(() =>
-    localStorage.getItem(STORAGE_KEYS.CURRENT_CHAT_ID)
-  );
-  const [savedChats, setSavedChats] = useState<SavedChat[]>(() =>
-    retrieveFromLocalStorage<SavedChat[]>(STORAGE_KEYS.SAVED_CHATS, [])
-  );
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [savedChats, setSavedChats] = useState<SavedChat[]>([]);
 
   // Refs
   const streamingContentRef = useRef<string>("");
@@ -216,21 +194,32 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     };
   }, [isProcessing]);
 
-  // Load data from localStorage on mount
+  // Load data from backend on mount
   useEffect(() => {
-    const savedMessages = retrieveFromLocalStorage<Message[]>(STORAGE_KEYS.MESSAGES, []);
-    const savedChatsData = retrieveFromLocalStorage<SavedChat[]>(STORAGE_KEYS.SAVED_CHATS, []);
-    const currentChatIdData = localStorage.getItem(STORAGE_KEYS.CURRENT_CHAT_ID);
-
-    // Set saved chats
-    if (savedChatsData.length > 0) {
-      setSavedChats(savedChatsData);
+    // Check session on server
+    const sess = await fetch('/api/session').then(r => r.json()).catch(() => ({ userId: null }));
+    if (!sess.userId) {
+      addWelcomeMessage();
+      return;
     }
-
-    // Set current chat ID
-    if (currentChatIdData) {
-      setCurrentChatId(currentChatIdData);
-    }
+    fetch(`/api/chats?userId=me`).then(async r => {
+      if (!r.ok) { addWelcomeMessage(); return; }
+      const chats = await r.json();
+      setSavedChats(chats.map((c: any) => ({ id: String(c.id), title: c.title || 'New Chat', messages: [], lastUpdated: new Date(c.updated_at || c.updatedAt || Date.now()) })));
+      if (chats[0]) {
+        const chatId = String(chats[0].id);
+        setCurrentChatId(chatId);
+        const msgsRes = await fetch(`/api/messages?chatId=${chatId}`);
+        if (msgsRes.ok) {
+          const rows = await msgsRes.json();
+          setMessages(rows.map((m: any) => ({ id: `db_${m.id}`, role: m.role, content: m.content, timestamp: new Date(m.timestamp) })));
+        } else {
+          addWelcomeMessage();
+        }
+      } else {
+        addWelcomeMessage();
+      }
+    }).catch(() => addWelcomeMessage());
 
     // Normalize any legacy Grok greeting in stored messages
     const normalizeGreeting = (msgs: Message[]): Message[] => {
@@ -258,14 +247,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       if (!currentChatIdData && savedMessages.length > 1) {
         const newId = generateId('chat-');
         setCurrentChatId(newId);
-        localStorage.setItem(STORAGE_KEYS.CURRENT_CHAT_ID, newId);
       }
     } else {
       addWelcomeMessage();
     }
   }, []);
 
-  // Save messages to localStorage
+  // Hook up reasoning toggle event (no storage side-effects here)
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { messageId: string; visible: boolean };
@@ -286,12 +274,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     }
   }, [messages]);
 
-  // Save chats to localStorage
-  useEffect(() => {
-    if (savedChats.length > 0) {
-      storeInLocalStorage(STORAGE_KEYS.SAVED_CHATS, savedChats);
-    }
-  }, [savedChats]);
+  // No localStorage persistence; chats are persisted server-side
 
   // Scroll to bottom for new messages
   useEffect(() => {
@@ -322,14 +305,14 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   // Add welcome message
   const addWelcomeMessage = () => {
     // Check if there's a custom bot to use
-    const customBotString = localStorage.getItem('currentCustomBot');
+    const customBotString = null;
 
     if (customBotString) {
       try {
         // Clear any existing active bot data first
         sessionStorage.removeItem('activeCustomBot');
 
-        const customBot = JSON.parse(customBotString);
+        const customBot = JSON.parse(customBotString as any);
 
         // Create a welcome message that reflects the bot's personality
         // Use a format that aligns with the bot's identity
@@ -406,15 +389,22 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   const saveCurrentChat = () => {
     if (messages.length <= 1) return; // Ignore empty/welcome-only chats
 
-    // Ensure we have a chat ID
-    let chatId = currentChatId;
-    if (!chatId) {
-      chatId = generateId('chat-');
-      setCurrentChatId(chatId);
-      try { localStorage.setItem(STORAGE_KEYS.CURRENT_CHAT_ID, chatId); } catch {}
-    }
+      // Ensure we have a chat ID (create in DB if missing)
+      let chatId = currentChatId;
+      if (!chatId) {
+        const userIdRaw = localStorage.getItem('userId');
+        const userId = userIdRaw ? parseInt(userIdRaw, 10) : 0;
+        if (userId) {
+          const r = await fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, title: chatTitle }) });
+          if (r.ok) {
+            const created = await r.json();
+            chatId = String(created.id);
+            setCurrentChatId(chatId);
+          }
+        }
+      }
 
-    const existingChatIndex = savedChats.findIndex(chat => chat.id === chatId);
+      const existingChatIndex = chatId ? savedChats.findIndex(chat => chat.id === chatId) : -1;
     const chatTitle = getChatTitle(messages);
 
     // Capture currently active custom bot (per chat) if present
@@ -447,10 +437,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         bot: botInfo ?? updatedChats[existingChatIndex].bot,
       };
       setSavedChats(updatedChats);
-      try {
-        storeInLocalStorage(STORAGE_KEYS.SAVED_CHATS, updatedChats);
-        storeInLocalStorage(STORAGE_KEYS.MESSAGES, messages);
-      } catch {}
+          // Persist new assistant message to DB
+          if (chatId) {
+            const last = messages[messages.length - 1];
+            if (last) {
+              fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chatId: Number(chatId), role: last.role, content: typeof last.content === 'string' ? last.content : JSON.stringify(last.content) }) });
+            }
+          }
     } else {
       // Add new chat
       const newSaved = {
@@ -462,10 +455,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       };
       const updatedChats = [...savedChats, newSaved];
       setSavedChats(updatedChats);
-      try {
-        storeInLocalStorage(STORAGE_KEYS.SAVED_CHATS, updatedChats);
-        storeInLocalStorage(STORAGE_KEYS.MESSAGES, messages);
-      } catch {}
+          if (chatId) {
+            const last = messages[messages.length - 1];
+            if (last) {
+              fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chatId: Number(chatId), role: last.role, content: typeof last.content === 'string' ? last.content : JSON.stringify(last.content) }) });
+            }
+          }
     }
   };
 
@@ -645,10 +640,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           apiMessages.push({ role: 'system', content: enhancedInstructions });
 
           // Ensure the custom bot info persists for the whole conversation
-          if (localStorage.getItem('currentCustomBot')) {
-            sessionStorage.setItem('activeCustomBot', customBotString);
-            localStorage.removeItem('currentCustomBot');
-          }
+          // active bot is managed via user_settings.active_project_id
         } catch (error) {
           console.error('Failed to parse custom bot data:', error);
           // Fallback to default system message
@@ -1013,7 +1005,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
     // Clear any active custom bot data
     sessionStorage.removeItem('activeCustomBot');
-    localStorage.removeItem('currentCustomBot');
 
     // Add a fresh welcome message
     addWelcomeMessage();

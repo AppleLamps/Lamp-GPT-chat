@@ -8,22 +8,29 @@ import Index from "./pages/Index";
 import Projects from "./pages/Projects";
 import ProjectsList from "./pages/ProjectsList";
 import NotFound from "./pages/NotFound";
+import Auth from "./pages/Auth";
 import { ProjectsProvider } from "./contexts/ProjectsContext";
 import { SettingsProvider } from "./contexts/SettingsContext";
 
 const queryClient = new QueryClient();
 
+const RequireUser: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [ok, setOk] = React.useState<boolean | null>(null);
+  React.useEffect(() => {
+    fetch('/api/session').then(async r => {
+      const d = await r.json();
+      if (!d.userId) window.location.href = '/auth'; else setOk(true);
+    }).catch(() => { window.location.href = '/auth'; });
+  }, []);
+  if (ok) return <>{children}</>;
+  return null;
+};
+
 const App = () => {
   // Check for system preference or saved preference on app load
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
-    if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    if (systemPrefersDark) document.documentElement.classList.add('dark');
   }, []);
 
   return (
@@ -35,10 +42,11 @@ const App = () => {
             <Sonner />
             <BrowserRouter>
               <Routes>
-                <Route path="/" element={<Index />} />
+                <Route path="/" element={<RequireUser><Index /></RequireUser>} />
                 <Route path="/projects" element={<ProjectsList />} />
                 <Route path="/projects/create" element={<Projects />} />
                 <Route path="/projects/edit/:id" element={<Projects />} />
+                <Route path="/auth" element={<Auth />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>

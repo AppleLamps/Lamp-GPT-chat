@@ -32,57 +32,32 @@ const STORAGE_KEY = 'localGrok_projects';
 export const ProjectsProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
   const [projects, setProjects] = useState<Project[]>([]);
 
-  // Load saved projects on init
+  // Load projects from backend on init
   useEffect(() => {
-    const savedProjects = localStorage.getItem(STORAGE_KEY);
-    if (savedProjects) {
-      try {
-        setProjects(JSON.parse(savedProjects));
-      } catch (error) {
-        console.error('Failed to parse saved projects:', error);
-        // Initialize with empty array on error
-        setProjects([]);
-      }
-    }
+    fetch(`/api/projects?userId=me`).then(async r => {
+      if (!r.ok) return;
+      const data = await r.json();
+      setProjects(data);
+    }).catch(() => {});
   }, []);
-
-  // Save projects to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-  }, [projects]);
 
   // Add a new project
   const addProject = (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const now = new Date().toISOString();
-    const newProject: Project = {
-      ...projectData,
-      id: `project_${Date.now()}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    
-    setProjects(prev => [...prev, newProject]);
-    return newProject.id;
+    fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'me', name: projectData.name, description: projectData.description, instructions: projectData.instructions, conversationStarters: projectData.conversationStarters }) })
+      .then(async r => { if (r.ok) { const p = await r.json(); setProjects(prev => [...prev, { ...projectData, id: String(p.id), createdAt: p.createdAt, updatedAt: p.updatedAt }]); } });
+    return '';
   };
 
   // Update an existing project
   const updateProject = (id: string, updates: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>) => {
-    setProjects(prev => 
-      prev.map(project => 
-        project.id === id 
-          ? { 
-              ...project, 
-              ...updates, 
-              updatedAt: new Date().toISOString() 
-            }
-          : project
-      )
-    );
+    fetch('/api/projects', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: Number(id), userId: 'me', name: updates.name, description: updates.description, instructions: updates.instructions, conversationStarters: updates.conversationStarters }) })
+      .then(() => setProjects(prev => prev.map(project => project.id === id ? { ...project, ...updates, updatedAt: new Date().toISOString() } : project)));
   };
 
   // Delete a project
   const deleteProject = (id: string) => {
-    setProjects(prev => prev.filter(project => project.id !== id));
+    fetch(`/api/projects?id=${id}&userId=me`, { method: 'DELETE' })
+      .then(() => setProjects(prev => prev.filter(project => project.id !== id)));
   };
 
   // Get a project by ID

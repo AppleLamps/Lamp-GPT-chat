@@ -367,8 +367,16 @@ export const xaiService = {
       content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)
     })));
     
-    // Get API key from localStorage
-    const apiKey = localStorage.getItem("apiKey") || "";
+    // Get API key from backend storage (user must be selected)
+    // Get API key using server session
+    let apiKey = '';
+    try {
+      const r = await fetch(`/api/api-keys?userId=me&provider=openrouter`);
+      if (r.ok) {
+        const data = await r.json();
+        apiKey = data.secret || '';
+      }
+    } catch {}
     if (!apiKey) {
       throw new Error("API Key is required. Please set your API key in settings.");
     }

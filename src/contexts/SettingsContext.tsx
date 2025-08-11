@@ -38,35 +38,19 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const { toast } = useToast();
   
   useEffect(() => {
-    // Load settings from localStorage
-    const storedApiKey = localStorage.getItem('apiKey');
-    const storedGetimgApiKey = localStorage.getItem('getimgApiKey');
-    const storedTemperature = localStorage.getItem('modelTemperature');
-    const storedMaxTokens = localStorage.getItem('maxTokens');
-    const storedModel = localStorage.getItem('currentModel');
-    
-    if (storedApiKey) {
-      setApiKey(storedApiKey);
-    } else {
-      // Automatically open settings panel if no API key is stored
-      setSettingsOpen(true);
-    }
+    // Prefer server-stored settings; fallback to defaults
+    fetch(`/api/api-keys?userId=me&provider=openrouter`).then(async r => {
+        if (r.ok) { const d = await r.json(); setApiKey(d.secret || ''); } else { setSettingsOpen(true); }
+      }).catch(() => setSettingsOpen(true));
 
-    if (storedGetimgApiKey) {
-      setGetimgApiKey(storedGetimgApiKey);
-    }
-    
-    if (storedTemperature) {
-      setModelTemperature(parseFloat(storedTemperature));
-    }
-    
-    if (storedMaxTokens) {
-      setMaxTokens(parseInt(storedMaxTokens, 10));
-    }
-
-    if (storedModel) {
-      setCurrentModel(storedModel);
-    }
+    // load numeric/text settings
+    fetch(`/api/user-settings?userId=me`).then(async r => {
+      if (!r.ok) return;
+      const d = await r.json();
+      if (d.model_temperature != null) setModelTemperature(d.model_temperature);
+      if (d.max_tokens != null) setMaxTokens(d.max_tokens);
+      if (d.current_model) setCurrentModel(d.current_model);
+    }).catch(() => {});
   }, []);
   
   const handleSaveSettings = (key: string, temp: number, tokens: number, model?: string) => {
@@ -77,16 +61,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       setCurrentModel(model);
     }
     
-    // Save to localStorage
+    // Persist to backend if we have a user
     if (key) {
-      localStorage.setItem('apiKey', key);
+      fetch('/api/api-keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'me', provider: 'openrouter', secret: key }) });
     }
-    
-    localStorage.setItem('modelTemperature', temp.toString());
-    localStorage.setItem('maxTokens', tokens.toString());
-    if (model) {
-      localStorage.setItem('currentModel', model);
-    }
+    fetch('/api/user-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'me', model_temperature: temp, max_tokens: tokens, current_model: model || currentModel }) });
     
     // Close settings after saving
     setSettingsOpen(false);

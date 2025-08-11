@@ -117,8 +117,9 @@ const ChatInput = ({
   // Function to enhance prompts using AI
   const enhancePromptWithAI = async (originalPrompt: string): Promise<string> => {
     try {
-      // Get the API key from localStorage
-      const apiKey = localStorage.getItem('apiKey');
+      // Get the API key from backend via session
+      let apiKey: string | null = null;
+      try { const r = await fetch('/api/api-keys?userId=me&provider=openrouter'); if (r.ok) { const d = await r.json(); apiKey = d.secret || null; } } catch {}
       
       if (!apiKey) {
         throw new Error("API key is missing");
@@ -184,8 +185,10 @@ const ChatInput = ({
   // Function to handle image generation via Getimg FLUX.1 [schnell]
   const generateImage = async (prompt: string) => {
     try {
-      const openRouterApiKey = localStorage.getItem('apiKey');
-      const getimgApiKey = localStorage.getItem('getimgApiKey');
+      let openRouterApiKey: string | null = null;
+      try { const r = await fetch('/api/api-keys?userId=me&provider=openrouter'); if (r.ok) { const d = await r.json(); openRouterApiKey = d.secret || null; } } catch {}
+      let getimgApiKey: string | null = null;
+      try { const r = await fetch('/api/api-keys?userId=me&provider=getimg'); if (r.ok) { const d = await r.json(); getimgApiKey = d.secret || null; } } catch {}
       if (!openRouterApiKey) {
         throw new Error("API key is missing. Please set your OpenRouter API key in the settings.");
       }
@@ -555,8 +558,8 @@ const ChatInput = ({
                   <Select
                     value={currentModel}
                     onValueChange={(value) => {
-                      setCurrentModel(value);
-                      try { localStorage.setItem('currentModel', value); } catch {}
+                       setCurrentModel(value);
+                       try { fetch('/api/user-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'me', current_model: value }) }); } catch {}
                     }}
                   >
                     <SelectTrigger

@@ -37,12 +37,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onEdit, onDelete }) 
   };
 
   // Navigate to chat with the custom bot instructions
-  const handleUseBot = () => {
-    localStorage.removeItem('chatMessages');
-    localStorage.removeItem('currentChatId');
-    sessionStorage.removeItem('activeCustomBot');
-
-    localStorage.setItem('currentCustomBot', JSON.stringify(project));
+  const handleUseBot = async () => {
+    try {
+      await fetch('/api/user-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'me', active_project_id: Number(project.id) }) });
+    } catch {}
     navigate('/');
   };
 

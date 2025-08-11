@@ -43,19 +43,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setInputApiKey(apiKey);
     setTemperatureValue(temperature);
     setMaxTokensValue(maxTokens);
-    setInputGetimgKey(getimgApiKey || localStorage.getItem('getimgApiKey') || "");
+    setInputGetimgKey(getimgApiKey || "");
   }, [apiKey, temperature, maxTokens]);
 
   const handleSave = () => {
     try {
       onSave(inputApiKey, temperatureValue, maxTokensValue);
-      // Save Getimg key via context + localStorage
-      setGetimgApiKey(inputGetimgKey || "");
-      if (inputGetimgKey) {
-        localStorage.setItem('getimgApiKey', inputGetimgKey);
-      } else {
-        localStorage.removeItem('getimgApiKey');
+      // Save Getimg key to backend under provider 'getimg'
+      const userResp = await fetch('/api/session');
+      const userData = await userResp.json();
+      if (userData.userId) {
+        await fetch('/api/api-keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'me', provider: 'getimg', secret: inputGetimgKey || '' }) });
       }
+      setGetimgApiKey(inputGetimgKey || "");
       setSaveStatus("success");
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (error) {

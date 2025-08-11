@@ -7,7 +7,7 @@ export function useTheme() {
     const [theme, setTheme] = useState<Theme>(() => {
         // Check localStorage for saved theme preference
         if (typeof window !== 'undefined') {
-            const savedTheme = localStorage.getItem('theme') as Theme | null;
+            const savedTheme = null;
 
             // Return saved theme or detect system preference
             if (savedTheme) {
@@ -26,8 +26,8 @@ export function useTheme() {
     // Apply theme whenever it changes
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            // Save to localStorage
-            localStorage.setItem('theme', theme);
+            // Optionally persist to server settings
+            fetch('/api/user-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'me', theme }) }).catch(() => {});
 
             // Apply theme to document element
             if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {

@@ -37,15 +37,24 @@ const ChatSidebar = ({ sidebarVisible, formatDate, toggleSidebar }: ChatSidebarP
     const readActiveBot = () => {
       let bot: { id?: string; name: string } | null = null;
       try {
-        const raw = sessionStorage.getItem('activeCustomBot') || localStorage.getItem('currentCustomBot');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === 'object') {
-            bot = { id: parsed.id, name: parsed.name };
+        // Prefer active_project_id from backend settings
+        fetch('/api/user-settings?userId=me').then(async r => {
+          if (!r.ok) return;
+          const d = await r.json();
+          if (d.active_project_id) {
+            // minimal fetch to get project name
+            const pr = await fetch('/api/projects?userId=me');
+            if (pr.ok) {
+              const list = await pr.json();
+              const p = list.find((x: any) => Number(x.id) === Number(d.active_project_id));
+              if (p) bot = { id: String(p.id), name: p.name };
+              setActiveBot(bot);
+              return;
+            }
           }
-        }
+          setActiveBot(null);
+        });
       } catch {}
-      setActiveBot(bot);
     };
     readActiveBot();
     const onStorage = () => readActiveBot();
