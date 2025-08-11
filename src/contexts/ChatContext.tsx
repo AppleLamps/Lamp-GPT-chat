@@ -402,11 +402,19 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     return title.length > 50 ? `${title.substring(0, 50)}...` : title;
   };
 
-  // Save current chat
+  // Save current chat (ensures an ID exists and writes synchronously to localStorage too)
   const saveCurrentChat = () => {
-    if (messages.length <= 1 || !currentChatId) return;
+    if (messages.length <= 1) return; // Ignore empty/welcome-only chats
 
-    const existingChatIndex = savedChats.findIndex(chat => chat.id === currentChatId);
+    // Ensure we have a chat ID
+    let chatId = currentChatId;
+    if (!chatId) {
+      chatId = generateId('chat-');
+      setCurrentChatId(chatId);
+      try { localStorage.setItem(STORAGE_KEYS.CURRENT_CHAT_ID, chatId); } catch {}
+    }
+
+    const existingChatIndex = savedChats.findIndex(chat => chat.id === chatId);
     const chatTitle = getChatTitle(messages);
 
     // Capture currently active custom bot (per chat) if present
@@ -439,18 +447,25 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         bot: botInfo ?? updatedChats[existingChatIndex].bot,
       };
       setSavedChats(updatedChats);
+      try {
+        storeInLocalStorage(STORAGE_KEYS.SAVED_CHATS, updatedChats);
+        storeInLocalStorage(STORAGE_KEYS.MESSAGES, messages);
+      } catch {}
     } else {
       // Add new chat
-      setSavedChats(prev => [
-        ...prev,
-        {
-          id: currentChatId,
-          title: chatTitle,
-          messages: [...messages],
-          lastUpdated: new Date(),
-          bot: botInfo,
-        }
-      ]);
+      const newSaved = {
+        id: chatId,
+        title: chatTitle,
+        messages: [...messages],
+        lastUpdated: new Date(),
+        bot: botInfo,
+      };
+      const updatedChats = [...savedChats, newSaved];
+      setSavedChats(updatedChats);
+      try {
+        storeInLocalStorage(STORAGE_KEYS.SAVED_CHATS, updatedChats);
+        storeInLocalStorage(STORAGE_KEYS.MESSAGES, messages);
+      } catch {}
     }
   };
 
@@ -983,6 +998,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
   // Start a new chat
   const handleStartNewChat = () => {
+    // Save current chat snapshot before resetting
+    try { saveCurrentChat(); } catch {}
+
     // Clear all messages
     setMessages([]);
 
@@ -1000,6 +1018,17 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     // Add a fresh welcome message
     addWelcomeMessage();
   };
+
+  // Save when leaving the page/tab
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try { saveCurrentChat(); } catch {}
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [messages, currentChatId, savedChats]);
 
   // Function to regenerate a message
   const regenerateMessage = async (messageId: string) => {

@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, FolderKanban, ChevronLeft, LayoutGrid, List, Trash2, AlertTriangle } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { Plus, Search, FolderKanban, ChevronLeft, LayoutGrid, List, Trash2, AlertTriangle, Download, Upload } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useProjects } from '@/contexts/ProjectsContext';
+import { useToast } from '@/hooks/use-toast';
 import ProjectCard from '@/components/ProjectCard';
 
 const ProjectsList: React.FC = () => {
-  const { projects, deleteProject } = useProjects();
+  const { projects, deleteProject, exportProjects, importProjects } = useProjects();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -13,6 +14,8 @@ const ProjectsList: React.FC = () => {
   const [sortBy, setSortBy] = useState<'name' | 'updated'>('updated');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { toast } = useToast();
 
   // Handle window resize events
   useEffect(() => {
@@ -73,6 +76,53 @@ const ProjectsList: React.FC = () => {
     setShowDeleteConfirm(null);
   };
 
+  const handleExport = () => {
+    try {
+      const data = exportProjects();
+      const payload = { projects: data };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `projects-export-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: 'Exported', description: 'Projects exported as JSON.' });
+    } catch (error) {
+      console.error(error);
+      toast({ title: 'Export failed', description: 'Could not export projects.' });
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const json = JSON.parse(String(reader.result));
+        const { importedCount } = importProjects(json);
+        toast({ title: 'Import complete', description: `${importedCount} project(s) imported.` });
+      } catch (err) {
+        console.error(err);
+        toast({ title: 'Import failed', description: 'Invalid JSON file.' });
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.onerror = () => {
+      toast({ title: 'Import failed', description: 'Could not read file.' });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Top navigation bar */}
@@ -85,13 +135,48 @@ const ProjectsList: React.FC = () => {
               </Link>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">Projects</h1>
             </div>
-            <button
-              onClick={handleNewProject}
-              className="flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 rounded-md shadow-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-opacity-50"
-            >
-              <Plus size={16} className="mr-2" />
-              {!isMobile && "New Project"}
-            </button>
+            <div className="flex items-center gap-2">
+              <a
+                href="/projects-import-template.json"
+                download
+                className="flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Download JSON import template"
+              >
+                Template
+              </a>
+              <button
+                onClick={handleExport}
+                className="flex items-center justify-center px-3 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors"
+                aria-label="Export projects to JSON"
+              >
+                <Download size={16} className="mr-2" />
+                {!isMobile && 'Export'}
+              </button>
+              <button
+                onClick={handleImportClick}
+                className="flex items-center justify-center px-3 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors"
+                aria-label="Import projects from JSON"
+              >
+                <Upload size={16} className="mr-2" />
+                {!isMobile && 'Import'}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={handleImportChange}
+                aria-label="Import projects JSON file"
+                title="Import projects JSON file"
+              />
+              <button
+                onClick={handleNewProject}
+                className="flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 rounded-md shadow-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-opacity-50"
+              >
+                <Plus size={16} className="mr-2" />
+                {!isMobile && "New Project"}
+              </button>
+            </div>
           </div>
         </div>
       </div>

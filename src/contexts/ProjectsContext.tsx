@@ -18,6 +18,8 @@ interface ProjectsContextType {
   updateProject: (id: string, updates: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>) => void;
   deleteProject: (id: string) => void;
   getProject: (id: string) => Project | undefined;
+  exportProjects: () => Project[];
+  importProjects: (input: unknown) => { importedCount: number };
 }
 
 // Create context
@@ -94,7 +96,38 @@ export const ProjectsProvider: React.FC<{children: React.ReactNode}> = ({ childr
     addProject,
     updateProject,
     deleteProject,
-    getProject
+    getProject,
+    exportProjects: () => projects,
+    importProjects: (input: unknown) => {
+      // Normalize input into an array of project-like objects
+      const normalizeToArray = (raw: unknown): Array<Partial<Project>> => {
+        if (Array.isArray(raw)) return raw as Array<Partial<Project>>;
+        if (raw && typeof raw === 'object') {
+          const obj = raw as Record<string, unknown>;
+          if (Array.isArray(obj.projects)) return obj.projects as Array<Partial<Project>>;
+          return [obj as Partial<Project>];
+        }
+        return [];
+      };
+
+      const candidates = normalizeToArray(input);
+      let importedCount = 0;
+
+      for (const candidate of candidates) {
+        if (!candidate || typeof candidate !== 'object') continue;
+        const name = typeof candidate.name === 'string' && candidate.name.trim() ? candidate.name.trim() : 'Untitled Project';
+        const description = typeof candidate.description === 'string' ? candidate.description : '';
+        const instructions = typeof candidate.instructions === 'string' ? candidate.instructions : '';
+        const conversationStarters = Array.isArray(candidate.conversationStarters)
+          ? candidate.conversationStarters.filter((s): s is string => typeof s === 'string')
+          : [];
+
+        addProject({ name, description, instructions, conversationStarters });
+        importedCount += 1;
+      }
+
+      return { importedCount };
+    }
   };
 
   return (
