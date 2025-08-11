@@ -33,6 +33,17 @@ async function main(): Promise<void> {
     UNIQUE(user_id, provider)
   );`;
 
+  // Projects must exist before user_settings due to FK
+  await sql`CREATE TABLE IF NOT EXISTS projects (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT,
+    data JSONB,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+  );`;
+
   await sql`CREATE TABLE IF NOT EXISTS user_settings (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     model_temperature DOUBLE PRECISION DEFAULT 0.7,
@@ -41,16 +52,6 @@ async function main(): Promise<void> {
     theme TEXT DEFAULT 'system',
     draft_project JSONB,
     active_project_id INTEGER REFERENCES projects(id),
-    updated_at TIMESTAMPTZ DEFAULT now()
-  );`;
-
-  await sql`CREATE TABLE IF NOT EXISTS projects (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    title TEXT NOT NULL,
-    description TEXT,
-    data JSONB,
-    created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
   );`;
 
