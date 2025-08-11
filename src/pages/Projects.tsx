@@ -267,17 +267,20 @@ const Projects: React.FC = () => {
   // Load draft from localStorage if in create mode
   useEffect(() => {
     if (!isEditMode) {
-      let savedDraft: string | null = null;
-      try { const r = await fetch(`/api/project-draft?userId=me`); if (r.ok) savedDraft = JSON.stringify(await r.json()); } catch {}
-      if (savedDraft) {
+      let cancelled = false;
+      (async () => {
         try {
-          const parsedDraft = JSON.parse(savedDraft);
-          setFormData(parsedDraft);
-          console.log('Loaded project draft from localStorage');
-        } catch (error) {
-          console.error('Failed to parse project draft:', error);
-        }
-      }
+          const r = await fetch(`/api/project-draft?userId=me`);
+          if (!cancelled && r.ok) {
+            const draft = await r.json();
+            if (draft) {
+              setFormData(draft);
+              console.log('Loaded project draft from server');
+            }
+          }
+        } catch {}
+      })();
+      return () => { cancelled = true; };
     }
   }, [isEditMode]);
 

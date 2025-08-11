@@ -196,32 +196,38 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
   // Load data from backend on mount
   useEffect(() => {
-    // Check session on server
-    const sess = await fetch('/api/session').then(r => r.json()).catch(() => ({ userId: null }));
-    if (!sess.userId) {
-      addWelcomeMessage();
-      return;
-    }
-    fetch(`/api/chats?userId=me`).then(async r => {
-      if (!r.ok) { addWelcomeMessage(); return; }
-      const chats = await r.json();
-      setSavedChats(chats.map((c: any) => ({ id: String(c.id), title: c.title || 'New Chat', messages: [], lastUpdated: new Date(c.updated_at || c.updatedAt || Date.now()) })));
-      if (chats[0]) {
-        const chatId = String(chats[0].id);
-        setCurrentChatId(chatId);
-        const msgsRes = await fetch(`/api/messages?chatId=${chatId}`);
-        if (msgsRes.ok) {
-          const rows = await msgsRes.json();
-          setMessages(rows.map((m: any) => ({ id: `db_${m.id}`, role: m.role, content: m.content, timestamp: new Date(m.timestamp) })));
-        } else {
-          addWelcomeMessage();
+    let cancelled = false;
+    (async () => {
+      try {
+        const sess = await fetch('/api/session').then(r => r.json()).catch(() => ({ userId: null }));
+        if (!sess.userId) {
+          if (!cancelled) addWelcomeMessage();
+          return;
         }
-      } else {
-        addWelcomeMessage();
+        const r = await fetch(`/api/chats?userId=me`);
+        if (!r.ok) { if (!cancelled) addWelcomeMessage(); return; }
+        const chats = await r.json();
+        if (cancelled) return;
+        setSavedChats(chats.map((c: any) => ({ id: String(c.id), title: c.title || 'New Chat', messages: [], lastUpdated: new Date(c.updated_at || c.updatedAt || Date.now()) })));
+        if (chats[0]) {
+          const chatId = String(chats[0].id);
+          setCurrentChatId(chatId);
+          const msgsRes = await fetch(`/api/messages?chatId=${chatId}`);
+          if (msgsRes.ok) {
+            const rows = await msgsRes.json();
+            if (!cancelled) setMessages(rows.map((m: any) => ({ id: `db_${m.id}`, role: m.role, content: m.content, timestamp: new Date(m.timestamp) })));
+          } else {
+            if (!cancelled) addWelcomeMessage();
+          }
+        } else {
+          if (!cancelled) addWelcomeMessage();
+        }
+      } catch {
+        if (!cancelled) addWelcomeMessage();
       }
-    }).catch(() => addWelcomeMessage());
+    })();
 
-    // Normalize any legacy Grok greeting in stored messages
+    // On mount, if there were any locally stored messages, normalize greeting (defensive)
     const normalizeGreeting = (msgs: Message[]): Message[] => {
       const oldText = "Hello! I'm Grok, your AI assistant. How can I help you today?";
       const newText = "Hello! I'm your AI assistant. How can I help you today?";
@@ -238,19 +244,15 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
       }
       return mapped;
     };
-
-    // Set messages or add welcome message
-    if (savedMessages.length > 0) {
-      setMessages(normalizeGreeting(savedMessages));
-
-      // Generate new chat ID if needed
-      if (!currentChatIdData && savedMessages.length > 1) {
-        const newId = generateId('chat-');
-        setCurrentChatId(newId);
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.MESSAGES);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Message[];
+        if (!cancelled && parsed.length > 0) setMessages(normalizeGreeting(parsed));
       }
-    } else {
-      addWelcomeMessage();
-    }
+    } catch {}
+
+    return () => { cancelled = true; };
   }, []);
 
   // Hook up reasoning toggle event (no storage side-effects here)
@@ -386,26 +388,30 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   };
 
   // Save current chat (ensures an ID exists and writes synchronously to localStorage too)
-  const saveCurrentChat = () => {
+  const storeInLocalStorage = (key: string, value: unknown) => {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  };
+
+  const saveCurrentChat = async () => {
     if (messages.length <= 1) return; // Ignore empty/welcome-only chats
 
-      // Ensure we have a chat ID (create in DB if missing)
-      let chatId = currentChatId;
-      if (!chatId) {
-        const userIdRaw = localStorage.getItem('userId');
-        const userId = userIdRaw ? parseInt(userIdRaw, 10) : 0;
-        if (userId) {
-          const r = await fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, title: chatTitle }) });
-          if (r.ok) {
-            const created = await r.json();
-            chatId = String(created.id);
-            setCurrentChatId(chatId);
-          }
+    const chatTitle = getChatTitle(messages);
+    // Ensure we have a chat ID (create in DB if missing)
+    let chatId = currentChatId;
+    if (!chatId) {
+      const userIdRaw = localStorage.getItem('userId');
+      const userId = userIdRaw ? parseInt(userIdRaw, 10) : 0;
+      if (userId) {
+        const r = await fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, title: chatTitle }) });
+        if (r.ok) {
+          const created = await r.json();
+          chatId = String(created.id);
+          setCurrentChatId(chatId);
         }
       }
+    }
 
-      const existingChatIndex = chatId ? savedChats.findIndex(chat => chat.id === chatId) : -1;
-    const chatTitle = getChatTitle(messages);
+    const existingChatIndex = chatId ? savedChats.findIndex(chat => chat.id === chatId) : -1;
 
     // Capture currently active custom bot (per chat) if present
     let botInfo: SavedBotInfo | undefined;

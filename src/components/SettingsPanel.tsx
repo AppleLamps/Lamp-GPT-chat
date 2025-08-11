@@ -46,7 +46,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setInputGetimgKey(getimgApiKey || "");
   }, [apiKey, temperature, maxTokens]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
       onSave(inputApiKey, temperatureValue, maxTokensValue);
       // Save Getimg key to backend under provider 'getimg'
